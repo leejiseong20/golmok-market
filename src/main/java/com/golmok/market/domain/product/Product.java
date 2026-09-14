@@ -4,6 +4,8 @@ import com.golmok.market.domain.category.Category;
 import com.golmok.market.domain.region.Region;
 import com.golmok.market.domain.user.User;
 import com.golmok.market.global.entity.BaseTimeEntity;
+import com.golmok.market.global.error.BusinessException;
+import com.golmok.market.global.error.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -60,7 +62,8 @@ public class Product extends BaseTimeEntity {
     @Column(name = "trade_type", nullable = false, length = 10)
     private TradeType tradeType;
 
-    @Column(name = "view_count", nullable = false)
+    // 조회수는 원자적 벌크 UPDATE 전용이다. 오래된 엔티티 저장으로 증가분을 덮어쓰지 않는다.
+    @Column(name = "view_count", nullable = false, updatable = false)
     private int viewCount;
 
     @Column(name = "favorite_count", nullable = false)
@@ -82,7 +85,7 @@ public class Product extends BaseTimeEntity {
      * 나머지 연관관계(찜, 채팅, 거래)는 전부 단방향이다.
      */
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sortOrder ASC")
+    @OrderBy("sortOrder ASC, id ASC")
     private List<ProductImage> images = new ArrayList<>();
 
     @Builder
@@ -147,7 +150,7 @@ public class Product extends BaseTimeEntity {
 
     public void markSold() {
         if (this.status == ProductStatus.SOLD) {
-            throw new IllegalStateException("이미 거래가 완료된 상품입니다.");
+            throw new BusinessException(ErrorCode.INVALID_STATE, "이미 거래가 완료된 상품입니다.");
         }
         this.status = ProductStatus.SOLD;
     }
@@ -159,7 +162,7 @@ public class Product extends BaseTimeEntity {
 
     private void requireStatus(ProductStatus expected, String message) {
         if (this.status != expected) {
-            throw new IllegalStateException(message);
+            throw new BusinessException(ErrorCode.INVALID_STATE, message);
         }
     }
 
@@ -167,7 +170,7 @@ public class Product extends BaseTimeEntity {
 
     public void bump() {
         if (!canBump()) {
-            throw new IllegalStateException("끌어올리기는 24시간에 한 번만 가능합니다.");
+            throw new BusinessException(ErrorCode.INVALID_STATE, "끌어올리기는 24시간에 한 번만 가능합니다.");
         }
         this.bumpedAt = LocalDateTime.now();
     }
@@ -179,10 +182,6 @@ public class Product extends BaseTimeEntity {
     // ---------- 카운터 ----------
     // COUNT(*) 대신 컬럼으로 들고 있는다. 목록 화면에서 상품마다
     // 집계 쿼리가 나가는 것을 막기 위한 의도적인 비정규화.
-
-    public void increaseViewCount() {
-        this.viewCount++;
-    }
 
     public void increaseFavoriteCount() {
         this.favoriteCount++;

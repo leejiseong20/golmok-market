@@ -263,6 +263,22 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 | `cursor` | String | X | 첫 페이지는 생략 |
 | `size` | int | X | 기본 20, 최대 50 |
 
+비로그인 조회를 허용한다. `regionId`, `categoryId`는 양수여야 한다.
+동네 ID 누락·ID 형식 오류·0 이하 ID·지원하지 않는 `sort`는 `400 INVALID_INPUT`이다.
+존재하지 않는 양수 동네·카테고리 ID는 필터에 일치하는 상품이 없는 것으로 보고 빈 목록을 반환한다.
+
+정렬은 `LATEST`: `bumpedAt DESC, id DESC`, `PRICE_ASC`: `price ASC, id ASC`다.
+`Cursor / PageSize / CursorResponse` 공통 규칙을 사용한다. 목록 조회로 조회수는 증가하지 않는다.
+정렬·필터를 변경하면 커서를 생략하고 첫 페이지부터 요청한다.
+`LATEST` 커서는 날짜(연도 1000~9999), `PRICE_ASC` 커서는 가격(0~2147483647)을 정렬값으로 사용한다.
+잘못된 커서는 `400 INVALID_INPUT`이다. 기존 커서 오류 응답은 `errors` 없이 코드·메시지·시각을 반환한다.
+응답 날짜는 초 단위로 표시하지만 `nextCursor`는 DB에서 읽은 정렬값의 정밀도를 유지하므로 그대로 돌려보낸다.
+
+`keyword`는 앞뒤 공백 제거 후 최대 50자다. 생략·빈 값·공백만 있으면 검색 필터를 적용하지 않는다.
+제목 또는 본문의 부분 일치 검색이며 `%`, `_`, `!`는 문자 그대로 취급한다.
+길이 초과는 `400 INVALID_INPUT`, `errors`의 `field`는 `keyword`다.
+현재 LIKE 검색으로 구현하며 MySQL FULLTEXT 인덱스는 사용하지 않는다. 검색 로그 적재는 구현 순서 7번에서 추가한다.
+
 ```json
 // 200 OK
 {
@@ -291,6 +307,9 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 
 `isLiked`는 비로그인 시 항상 `false`.
 삭제된 상품(`deleted_at IS NOT NULL`)은 목록에서 제외.
+`ON_SALE`, `RESERVED`, `SOLD` 모두 포함한다.
+`thumbnailUrl`은 이미지의 `sortOrder ASC, id ASC` 순서에서 첫 번째 URL이며 이미지가 없으면 `null`이다.
+결과가 없으면 `200 OK`, `content: []`, `nextCursor: null`, `hasNext: false`다.
 
 ---
 
@@ -327,6 +346,13 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 ```
 
 조회 시 `viewCount` 증가. 단, **본인 상품 조회는 증가시키지 않는다.**
+
+비로그인 조회도 허용하며 반복 요청마다 증가한다. 응답에는 해당 요청에서 증가한 조회수를 반영한다.
+동시 조회의 증가분이 유실되지 않도록 DB에서 원자적으로 증가시키며, 조회수 증가로 상품 수정 시각이나 끌어올리기 시각은 바뀌지 않는다.
+비로그인이면 `isLiked`, `isMine`은 모두 `false`다.
+`images`는 `sortOrder ASC, id ASC` 순서이고 이미지가 없으면 `[]`다. 판매 완료 상품도 조회할 수 있다.
+없는 상품과 삭제된 상품은 동일하게 `404 PRODUCT_NOT_FOUND`이며 조회수를 증가시키지 않는다.
+상품 ID 형식 오류·0 이하 ID는 `400 INVALID_INPUT`이다.
 
 ---
 

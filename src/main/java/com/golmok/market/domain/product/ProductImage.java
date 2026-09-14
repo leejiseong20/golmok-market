@@ -1,17 +1,16 @@
 package com.golmok.market.domain.product;
 
+import com.golmok.market.global.entity.BaseCreatedTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Getter
 @Table(name = "product_images")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ProductImage {
+public class ProductImage extends BaseCreatedTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,9 +26,6 @@ public class ProductImage {
     /** 0 이면 대표 이미지 */
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
-
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
-    private LocalDateTime createdAt;
 
     private ProductImage(Product product, String imageUrl, int sortOrder) {
         this.product = product;
