@@ -1,17 +1,16 @@
 package com.golmok.market.domain.region;
 
+import com.golmok.market.global.entity.BaseCreatedTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Entity
 @Getter
 @Table(name = "regions")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Region {
+public class Region extends BaseCreatedTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,8 +31,16 @@ public class Region {
     @Column(nullable = false)
     private Double lng;
 
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
-    private LocalDateTime createdAt;
+    /** DB 기본값 없이도 JPA auditing 으로 생성 시각을 채운다. */
+    public static Region create(String sido, String sigungu, String dong, double lat, double lng) {
+        Region region = new Region();
+        region.sido = sido;
+        region.sigungu = sigungu;
+        region.dong = dong;
+        region.lat = lat;
+        region.lng = lng;
+        return region;
+    }
 
     /** 화면 표시용 전체 주소 */
     public String getFullName() {

@@ -39,12 +39,17 @@
 - [완료] API 명세 확정 (에러 포맷 `errors` 필드, 목록별 커서 정렬값 반영)
 - [완료] 공통: 전역 예외 핸들러, 에러 응답 포맷(`errors` 필드 포함), 커서 페이징 유틸
 - [완료] 인증: 가입 / 로그인 / 재발급(rotation) / 로그아웃 / 중복 확인, Spring Security + JWT
-- [다음] 카테고리·동네 조회 → 상품 CRUD → **배포** → 채팅 → 알림 → 결제
+- [완료] 카테고리·동네 조회: 카테고리 전체 / 주소 부분 검색 / 근처 동네 최대 10개
+- [검증] 2026-09-14 `gradlew.bat build` 성공. 기존 67개 + 신규 62개 = 테스트 129개, 실패 0·오류 0·건너뜀 0. H2 서비스 통합 테스트·MockMvc 응답/입력 검증·거리 계산 경계 테스트 포함. 운영 MySQL 실행 및 EXPLAIN은 이번에 수행하지 않았다.
+- [다음] 상품 목록·상세 → 이미지 업로드·상품 CRUD → **배포** → 채팅 → 알림 → 결제
 
 ## 알려진 과제
 
-- 엔티티 9개(`Region`, `ChatRoom`, `ChatMessage`, `Notification`, `Favorite`, `ProductImage`, `SearchLog`, `Payment`, `Review`)의 `created_at`이 `insertable = false`(DB 기본값 의존)다. H2 테스트에서 INSERT가 실패하고, 저장 직후 `createdAt`이 null이다. 각 도메인 구현 시 `BaseCreatedTimeEntity`로 바꾼다. (`RefreshToken`은 완료)
+- 엔티티 8개(`ChatRoom`, `ChatMessage`, `Notification`, `Favorite`, `ProductImage`, `SearchLog`, `Payment`, `Review`)의 `created_at`이 `insertable = false`(DB 기본값 의존)다. H2 테스트에서 INSERT가 실패하고, 저장 직후 `createdAt`이 null이다. 각 도메인 구현 시 `BaseCreatedTimeEntity`로 바꾼다. (`RefreshToken`, `Region`은 완료)
 - 엔티티가 비즈니스 규칙 위반 시 `IllegalArgumentException`/`IllegalStateException`을 던진다. 403이어야 할 것(참여자 아님 등)도 400이 된다. 각 도메인 구현 시 `BusinessException`으로 바꾼다.
+- 동네 인증(`/api/users/me/regions`)은 조회 작업에서 제외했다. 별도 구현 시 최대 2개 제한의 동시 요청 처리, 대표 동네 정책, 응답 형식을 확정해야 한다. 상품 등록 전에 필요하다.
+- `JwtAuthenticationFilter`는 `Bearer `로 시작하지 않는 Authorization 헤더를 무시한다. 형식 오류 토큰을 401로 처리한다는 명세와 어긋날 여지가 있어 별도 정책 정리가 필요하다. 이번 조회 작업에서는 변경하지 않았다.
+- 동네 주소 부분 검색은 전체 주소를 연결한 LIKE 검색이므로 일반 인덱스로 검색 비용을 줄이기 어렵다. 근처 조회의 `(lat, lng)` 인덱스 역시 위도 범위 이후 경도까지 탐색에 효율적으로 쓰인다고 보장할 수 없다. 데이터 확대 시 MySQL EXPLAIN과 실측으로 확인한다.
 - 실행 시 환경변수 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
 
 ## 설계 결정 기록
@@ -56,6 +61,10 @@
 - **`trades.active_product_id`는 생성컬럼이다.** `status`가 취소/환불이면 NULL이 되어 UNIQUE 제약에서 빠진다. 덕분에 "진행 중 거래는 상품당 1건"이 서비스 레이어 락 없이 DB에서 보장된다.
 - **`view_count`, `favorite_count`, `chat_count`는 의도적 비정규화다.** 목록에서 상품마다 COUNT 쿼리가 나가는 것을 막기 위한 것.
 - **목록은 커서 페이징이다.** 끌어올리기로 순서가 계속 바뀌어서 offset 방식은 중복·누락이 생긴다.
+- **카테고리·동네 조회 3개는 배열 응답의 예외다.** 개별 명세의 배열 형식을 유지한다. 카테고리는 전체를 `sortOrder, id` 오름차순으로, 주소 검색은 일치하는 전체를 `id` 오름차순으로 반환한다. 상품 등 커서 목록은 기존 Cursor / PageSize / CursorResponse를 재사용한다.
+- **근처 동네는 DB 범위 조회 + Java Haversine 계산으로 찾는다.** MySQL 전용 공간 함수 없이 H2에서도 같은 코드를 검증한다. 5km에서 시작해 4배씩 반경을 넓히고 실제 원 안에 10개가 확보되면 종료한다. 사각형 후보 수만으로 종료하면 더 가까운 바깥 동네를 놓칠 수 있다. 최종 반경은 지구 반원 거리이며 그때 전체 조회해 10개 미만도 처리한다. 날짜변경선은 두 범위로 나누고 극점은 모든 경도를 포함한다. 거리 동률은 id로 정렬한다. 마스터 데이터가 적거나 드물면 반복 조회·최종 전체 조회 비용을 감수한다.
+- **동네 검색어는 앞뒤 공백 제거 후 최대 82자다.** 스키마의 시/도 20자 + 시/군/구 30자 + 동 30자 + 공백 2자를 기준으로 한다. 전체 주소 부분 일치이며 LIKE의 `%`, `_`, 이스케이프 문자 `!`를 문자 그대로 처리한다.
+- **Region 생성 시각은 BaseCreatedTimeEntity로 관리한다.** JPA 저장 시 값을 채우며 컬럼 정의는 동일하므로 SQL 스키마를 변경하지 않았다. 마스터 엔티티 Category·Region은 setter 대신 생성용 정적 팩터리를 제공한다. 테스트는 SQL 초기 데이터에 의존하지 않고 필요한 데이터를 직접 저장한다.
 - **이미지 업로드와 상품 등록을 분리했다.** 사진 선택 즉시 업로드해야 등록 버튼에서 기다리지 않는다.
 - **refresh token은 JWT가 아닌 무작위 문자열이고, DB에는 SHA-256 해시만 저장한다.** 어차피 DB 조회로 검증하니 서명이 필요 없다. 원문을 저장하면 DB 유출 시 바로 로그인에 쓸 수 있다. BCrypt가 아닌 이유는 256비트 난수라 대입 공격이 불가능하고, 솔트가 있으면 해시로 조회(UNIQUE 인덱스)할 수 없어서다.
 - **재발급 조회는 `SELECT ... FOR UPDATE`다.** 같은 refresh token으로 동시 재발급이 오면 둘 다 성공해 한쪽 토큰이 조용히 무효가 된다. 잠금으로 두 번째 요청이 명확히 실패하게 한다.

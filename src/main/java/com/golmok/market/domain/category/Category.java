@@ -29,6 +29,16 @@ public class Category {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /** 마스터 데이터 생성. 생성 후 변경은 setter 대신 별도 정책으로 다룬다. */
+    public static Category create(Category parent, String name, String iconUrl, int sortOrder) {
+        Category category = new Category();
+        category.parent = parent;
+        category.name = name;
+        category.iconUrl = iconUrl;
+        category.sortOrder = sortOrder;
+        return category;
+    }
+
     public boolean isRoot() {
         return this.parent == null;
     }
