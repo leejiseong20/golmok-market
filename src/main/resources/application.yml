@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: golmok-market
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/golmok?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      # DDL은 SQL 스크립트로 직접 관리한다. 절대 create/update 쓰지 말 것.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100   # N+1 완화 (IN 절로 묶어서 조회)
+    open-in-view: false                 # 영속성 컨텍스트를 컨트롤러까지 끌고 가지 않는다
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+server:
+  port: 8080
