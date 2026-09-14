@@ -4,6 +4,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationTrustResolver;
+import org.springframework.security.authentication.AuthenticationTrustResolverImpl;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.Errors;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -27,12 +32,14 @@ import java.util.List;
  *   원인은 스택트레이스와 함께 로그로만 남긴다.
  *
  * 주의: Spring Security 필터에서 발생하는 401/403 은 DispatcherServlet 앞에서
- * 끝나므로 여기까지 오지 않는다. 인증 단계에서 EntryPoint/AccessDeniedHandler 를
- * 따로 두고 ErrorResponse 를 재사용해야 한다.
+ * 끝나므로 여기까지 오지 않는다. 그쪽은 global.security 의
+ * RestAuthenticationEntryPoint / RestAccessDeniedHandler 가 같은 형식으로 응답한다.
  */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final AuthenticationTrustResolver trustResolver = new AuthenticationTrustResolverImpl();
 
     // ---------- 우리가 의도적으로 던진 예외 ----------
 
@@ -94,6 +101,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
         return respond(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    // ---------- 권한 ----------
+
+    /**
+     * 컨트롤러·서비스 안에서 발생한 권한 예외(@PreAuthorize 등).
+     * 이 핸들러가 없으면 아래 Exception 핸들러가 잡아 500 이 된다.
+     * 로그인하지 않은 사용자면 "권한 없음"이 아니라 "인증 필요"이므로 401 로 구분한다.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        ErrorCode errorCode = trustResolver.isAuthenticated(authentication)
+                ? ErrorCode.FORBIDDEN
+                : ErrorCode.UNAUTHORIZED;
+        return respond(errorCode, ErrorResponse.of(errorCode));
     }
 
     // ---------- 엔티티가 던지는 표준 예외 (임시 안전망) ----------

@@ -19,3 +19,12 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100
     open-in-view: false
+
+jwt:
+  # 테스트 전용 더미 키. 운영 키가 아니다.
+  secret: Z29sbW9rLW1hcmtldC10ZXN0LW9ubHktand0LXNlY3JldC1rZXkhIQ==
+  access-token-validity: 30m
+  refresh-token-validity: 14d
+
+cors:
+  allowed-origins: http://localhost:5173

@@ -49,6 +49,18 @@
 | 409 | 중복 (이메일, 닉네임, 찜) |
 | 500 | 서버 오류 |
 
+#### 401 코드 구분 (프론트 처리 기준)
+
+| code | 상황 | 프론트 동작 |
+|---|---|---|
+| `UNAUTHORIZED` | 인증이 필요한 API 에 토큰 없이 요청 | 로그인 화면으로 |
+| `EXPIRED_TOKEN` | access token 만료 | `/api/auth/reissue` 호출 후 원래 요청 재시도 |
+| `INVALID_TOKEN` | 위조·형식 오류 토큰 | 저장된 토큰 삭제 후 로그인 화면으로 |
+| `LOGIN_FAILED` | 이메일 또는 비밀번호 불일치 | 로그인 폼에 에러 표시 |
+| `INVALID_REFRESH_TOKEN` | refresh token 없음·만료·이미 사용됨 | 저장된 토큰 삭제 후 로그인 화면으로 |
+
+토큰이 **틀린 경우에는 공개 API(상품 목록 등)라도 401** 을 준다. 조용히 비로그인으로 처리하면 `isLiked` 가 이유 없이 `false` 로 보이고 프론트가 재발급할 기회를 놓치기 때문이다. 토큰을 아예 안 보내면 공개 API 는 비로그인으로 정상 응답한다.
+
 ### 페이징 — 커서 방식
 
 목록 API는 offset(`page=2`) 대신 **커서**를 쓴다.
@@ -103,7 +115,12 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 { "id": 1, "email": "user@example.com", "nickname": "골목이" }
 ```
 
-검증: 이메일 형식, 비밀번호 8자 이상(영문+숫자+특수문자), 닉네임 2~30자.
+검증: 이메일 형식(100자 이하), 비밀번호 8~64자(영문·숫자·특수문자 각 1자 이상, **공백·한글 불가**), 닉네임 2~30자, 휴대폰 `01`로 시작하는 숫자 10~11자리(선택).
+중복이면 `409` — `DUPLICATE_EMAIL` / `DUPLICATE_NICKNAME`.
+
+이메일은 소문자로 저장한다. `User@Example.com` 과 `user@example.com` 은 같은 계정이다.
+
+비밀번호를 ASCII 로 제한하는 이유: 비밀번호 해시(BCrypt)는 72바이트까지만 처리한다. 한글은 한 글자가 3바이트라 글자 수 제한만으로는 이 한도를 넘을 수 있다.
 
 ---
 
@@ -117,7 +134,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 // 200 OK
 {
   "accessToken": "eyJhbGci...",
-  "refreshToken": "eyJhbGci...",
+  "refreshToken": "q3Zr8Hk2...Xw",
   "user": {
     "id": 1,
     "nickname": "골목이",
@@ -127,7 +144,16 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 }
 ```
 
-`accessToken` 만료 30분, `refreshToken` 만료 14일.
+`accessToken` 은 JWT, 만료 30분. `refreshToken` 은 JWT 가 아닌 무작위 문자열(43자), 만료 14일.
+프론트는 두 값 모두 해석하지 않고 그대로 보관·전송하면 된다.
+동네 인증 전이면 `primaryRegion` 은 `null`.
+
+이메일이 없는 경우와 비밀번호가 틀린 경우 모두 `401 LOGIN_FAILED` 로 같게 응답한다(가입 여부 노출 방지).
+탈퇴·정지 계정은 비밀번호가 맞을 때만 `403 USER_NOT_ACTIVE`.
+
+여러 기기에서 동시에 로그인할 수 있다. 로그인할 때마다 refreshToken 이 따로 발급된다.
+
+**refreshToken 을 JWT 로 만들지 않은 이유**: refreshToken 은 어차피 서버 DB 에서 조회해 검증한다. 자체 서명이 필요 없다. DB 에는 원문이 아닌 SHA-256 해시만 저장해, DB 가 유출돼도 그 값으로 로그인할 수 없게 한다.
 
 ---
 
@@ -135,19 +161,33 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 
 ```json
 // Request
-{ "refreshToken": "eyJhbGci..." }
+{ "refreshToken": "q3Zr8Hk2...Xw" }
 ```
 ```json
 // 200 OK
-{ "accessToken": "eyJhbGci...", "refreshToken": "eyJhbGci..." }
+{ "accessToken": "eyJhbGci...", "refreshToken": "Tm9wZ3Vl...Qa" }
 ```
 
 재발급 시 refreshToken도 새로 발급하고 기존 것은 폐기한다(rotation). 탈취된 토큰의 유효 기간을 줄이기 위한 것.
+**응답으로 받은 새 refreshToken 으로 반드시 교체해야 한다.** 이전 값은 즉시 `401 INVALID_REFRESH_TOKEN`.
+
+만료된 accessToken 을 `Authorization` 헤더에 붙인 채 호출해도 된다. 이 API 는 access token 을 검사하지 않는다.
+
+**프론트 주의 — 재발급은 한 번만**: 여러 요청이 동시에 `EXPIRED_TOKEN` 을 받으면 각각 재발급을 호출하게 된다. 첫 번째가 성공하는 순간 기존 refreshToken 은 폐기되므로, 나머지는 `INVALID_REFRESH_TOKEN` 을 받고 로그아웃된다. 재발급 요청은 **진행 중인 것 하나를 공유**하고, 나머지 요청은 그 결과를 기다렸다가 새 토큰으로 재시도해야 한다.
 
 ---
 
 ### POST `/api/auth/logout` — 로그아웃
-인증 필요. 서버에서 해당 `refreshToken` 삭제. → `204 No Content`
+인증 필요.
+```json
+// Request
+{ "refreshToken": "q3Zr8Hk2...Xw" }
+```
+→ `204 No Content`
+
+여러 기기 로그인을 허용하므로 **요청한 기기의 refreshToken 만** 삭제한다. 본인 토큰이 아니거나 이미 없는 토큰이어도 에러 없이 `204` 다.
+
+로그아웃해도 이미 발급된 accessToken 은 만료(최대 30분)까지 서버에서 유효하다. 프론트는 로그아웃 시 두 토큰을 모두 지운다.
 
 ---
 

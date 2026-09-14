@@ -38,7 +38,14 @@
 - [완료] H2 테스트 분리, GitHub 푸시
 - [완료] API 명세 확정 (에러 포맷 `errors` 필드, 목록별 커서 정렬값 반영)
 - [완료] 공통: 전역 예외 핸들러, 에러 응답 포맷(`errors` 필드 포함), 커서 페이징 유틸
-- [다음] 인증(JWT) → 상품 CRUD → **배포** → 채팅 → 알림 → 결제
+- [완료] 인증: 가입 / 로그인 / 재발급(rotation) / 로그아웃 / 중복 확인, Spring Security + JWT
+- [다음] 카테고리·동네 조회 → 상품 CRUD → **배포** → 채팅 → 알림 → 결제
+
+## 알려진 과제
+
+- 엔티티 9개(`Region`, `ChatRoom`, `ChatMessage`, `Notification`, `Favorite`, `ProductImage`, `SearchLog`, `Payment`, `Review`)의 `created_at`이 `insertable = false`(DB 기본값 의존)다. H2 테스트에서 INSERT가 실패하고, 저장 직후 `createdAt`이 null이다. 각 도메인 구현 시 `BaseCreatedTimeEntity`로 바꾼다. (`RefreshToken`은 완료)
+- 엔티티가 비즈니스 규칙 위반 시 `IllegalArgumentException`/`IllegalStateException`을 던진다. 403이어야 할 것(참여자 아님 등)도 400이 된다. 각 도메인 구현 시 `BusinessException`으로 바꾼다.
+- 실행 시 환경변수 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
 
 ## 설계 결정 기록
 
@@ -50,4 +57,9 @@
 - **`view_count`, `favorite_count`, `chat_count`는 의도적 비정규화다.** 목록에서 상품마다 COUNT 쿼리가 나가는 것을 막기 위한 것.
 - **목록은 커서 페이징이다.** 끌어올리기로 순서가 계속 바뀌어서 offset 방식은 중복·누락이 생긴다.
 - **이미지 업로드와 상품 등록을 분리했다.** 사진 선택 즉시 업로드해야 등록 버튼에서 기다리지 않는다.
+- **refresh token은 JWT가 아닌 무작위 문자열이고, DB에는 SHA-256 해시만 저장한다.** 어차피 DB 조회로 검증하니 서명이 필요 없다. 원문을 저장하면 DB 유출 시 바로 로그인에 쓸 수 있다. BCrypt가 아닌 이유는 256비트 난수라 대입 공격이 불가능하고, 솔트가 있으면 해시로 조회(UNIQUE 인덱스)할 수 없어서다.
+- **재발급 조회는 `SELECT ... FOR UPDATE`다.** 같은 refresh token으로 동시 재발급이 오면 둘 다 성공해 한쪽 토큰이 조용히 무효가 된다. 잠금으로 두 번째 요청이 명확히 실패하게 한다.
+- **401을 `EXPIRED_TOKEN`과 `INVALID_TOKEN`으로 나눴다.** 프론트는 만료일 때만 재발급하고, 위조면 즉시 로그아웃한다.
+- **로그아웃해도 access token은 최대 30분 유효하다.** 막으려면 요청마다 블랙리스트를 조회해야 해서 JWT의 무상태 이점이 사라진다. 만료를 짧게 두는 것으로 대응한다.
+- **비밀번호는 ASCII 8~64자다.** BCrypt는 72바이트까지만 처리하는데, 한글이 섞이면 글자 수 제한만으로는 넘을 수 있다.
 - **테스트는 H2, 운영은 MySQL.** 테스트가 로컬 DB에 의존하면 CI에서 깨진다. 대신 MySQL 전용 문법(생성컬럼, FULLTEXT ngram)은 H2에서 검증되지 않으므로, 스키마 일치는 실제 실행 시 `validate`로 확인한다.

@@ -1,5 +1,6 @@
 package com.golmok.market.domain.user;
 
+import com.golmok.market.global.entity.BaseCreatedTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -11,7 +12,7 @@ import java.time.LocalDateTime;
 @Getter
 @Table(name = "refresh_tokens")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RefreshToken {
+public class RefreshToken extends BaseCreatedTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,9 +30,6 @@ public class RefreshToken {
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
-
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
-    private LocalDateTime createdAt;
 
     private RefreshToken(User user, String token, String deviceInfo, LocalDateTime expiresAt) {
         this.user = user;

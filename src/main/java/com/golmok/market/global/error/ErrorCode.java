@@ -29,7 +29,18 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type 입니다."),
 
     // 500
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
+
+    // ---------- 인증 ----------
+    // EXPIRED_TOKEN 과 INVALID_TOKEN 을 나눈 이유: 프론트는 만료일 때만 재발급을 시도하고,
+    // 위조·형식 오류면 곧바로 로그아웃시켜야 한다. 코드가 같으면 이 판단을 할 수 없다.
+    EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "액세스 토큰이 만료되었습니다."),
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "로그인이 만료되었습니다. 다시 로그인해 주세요."),
+    USER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "이용할 수 없는 계정입니다."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
+    DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다.");
 
     private final HttpStatus status;
     private final String message;
@@ -48,11 +59,15 @@ public enum ErrorCode {
      * 딱 맞는 코드가 없으면 4xx 는 INVALID_INPUT, 5xx 는 INTERNAL_ERROR 로 본다.
      */
     public static ErrorCode fromStatus(HttpStatusCode status) {
-        for (ErrorCode code : values()) {
-            if (code.status.value() == status.value()) {
-                return code;
-            }
-        }
-        return status.is4xxClientError() ? INVALID_INPUT : INTERNAL_ERROR;
+        // 같은 상태를 쓰는 코드가 여럿(401 만 5개)이라 enum 선언 순서에 기대지 않고 명시적으로 고른다.
+        return switch (status.value()) {
+            case 401 -> UNAUTHORIZED;
+            case 403 -> FORBIDDEN;
+            case 404 -> RESOURCE_NOT_FOUND;
+            case 405 -> METHOD_NOT_ALLOWED;
+            case 409 -> DUPLICATE_RESOURCE;
+            case 415 -> UNSUPPORTED_MEDIA_TYPE;
+            default -> status.is4xxClientError() ? INVALID_INPUT : INTERNAL_ERROR;
+        };
     }
 }
