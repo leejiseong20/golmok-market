@@ -66,7 +66,8 @@ public class Product extends BaseTimeEntity {
     @Column(name = "view_count", nullable = false, updatable = false)
     private int viewCount;
 
-    @Column(name = "favorite_count", nullable = false)
+    // 조회수와 마찬가지로 원자적 벌크 UPDATE 전용이다.
+    @Column(name = "favorite_count", nullable = false, updatable = false)
     private int favoriteCount;
 
     @Column(name = "chat_count", nullable = false)
@@ -183,15 +184,9 @@ public class Product extends BaseTimeEntity {
     // COUNT(*) 대신 컬럼으로 들고 있는다. 목록 화면에서 상품마다
     // 집계 쿼리가 나가는 것을 막기 위한 의도적인 비정규화.
 
-    public void increaseFavoriteCount() {
-        this.favoriteCount++;
-    }
-
-    public void decreaseFavoriteCount() {
-        if (this.favoriteCount > 0) {
-            this.favoriteCount--;
-        }
-    }
+    // 찜 수도 조회수와 같은 이유로 엔티티에서 증감하지 않는다.
+    // 두 사람이 동시에 찜하면 메모리에서 ++ 한 값끼리 덮어써 하나가 유실된다.
+    // ProductRepository 의 원자적 UPDATE 만 쓴다.
 
     public void increaseChatCount() {
         this.chatCount++;

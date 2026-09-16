@@ -43,7 +43,12 @@ public enum ErrorCode {
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
 
     // ---------- 상품 ----------
-    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다.");
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+
+    // ---------- 회원 · 찜 ----------
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    CANNOT_FAVORITE_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 찜할 수 없습니다."),
+    ALREADY_FAVORITED(HttpStatus.CONFLICT, "이미 찜한 상품입니다.");
 
     private final HttpStatus status;
     private final String message;

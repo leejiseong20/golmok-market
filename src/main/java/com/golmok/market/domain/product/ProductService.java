@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final FavoriteRepository favoriteRepository;
+    private final ProductThumbnails productThumbnails;
 
     public CursorResponse<ProductSummaryResponse> findPage(long regionId, Long categoryId, String keyword,
                                                           ProductSort sort, String rawCursor, Integer size, AuthUser viewer) {
@@ -41,15 +41,11 @@ public class ProductService {
         List<Product> fetched = productRepository.findPage(regionId, categoryId, normalizedKeyword, order, cursor, pageSize);
         CursorResponse<Product> page = CursorResponse.of(fetched, pageSize, order::cursorOf);
         List<Long> ids = page.content().stream().map(Product::getId).toList();
-        Map<Long, String> thumbnails = new HashMap<>();
+        // 페이징을 마친 상품에 대해서만 이미지·찜을 일괄 조회한다. 컬렉션 지연 로딩을 유발하지 않는다.
+        Map<Long, String> thumbnails = productThumbnails.of(ids);
         Set<Long> likedIds = new HashSet<>();
-        if (!ids.isEmpty()) {
-            // 페이징을 마친 상품에 대해서만 이미지·찜을 일괄 조회한다. 컬렉션 지연 로딩을 유발하지 않는다.
-            productImageRepository.findOrderedByProductIds(ids)
-                    .forEach(image -> thumbnails.putIfAbsent(image.getProduct().getId(), image.getImageUrl()));
-            if (viewer != null) {
-                likedIds.addAll(favoriteRepository.findLikedProductIds(viewer.id(), ids));
-            }
+        if (!ids.isEmpty() && viewer != null) {
+            likedIds.addAll(favoriteRepository.findLikedProductIds(viewer.id(), ids));
         }
         return page.map(product -> ProductSummaryResponse.from(product, thumbnails.get(product.getId()), likedIds.contains(product.getId())));
     }

@@ -21,7 +21,10 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Getter
-@Table(name = "trades")
+// active_product_id 의 UNIQUE 가 "진행 중 거래는 상품당 1건"을 보장한다.
+// 취소·환불이면 생성컬럼이 NULL 이 되어 제약에서 빠진다(NULL 은 중복으로 보지 않는다).
+@Table(name = "trades", uniqueConstraints =
+        @UniqueConstraint(name = "uk_trades_active_product", columnNames = "active_product_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Trade extends BaseTimeEntity {
 

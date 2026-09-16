@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Getter
-@Table(name = "chat_rooms")
+// 같은 상품에 같은 구매자는 방 1개. 동시 요청으로 방이 두 개 생기는 것을 DB 가 막는다.
+@Table(name = "chat_rooms", uniqueConstraints =
+        @UniqueConstraint(name = "uk_chat_room", columnNames = {"product_id", "buyer_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatRoom {
 

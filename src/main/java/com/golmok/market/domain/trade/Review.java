@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Getter
-@Table(name = "reviews")
+// 거래당 1인 1회. 매너온도가 여러 번 반영되는 것을 DB 가 막는다.
+@Table(name = "reviews", uniqueConstraints =
+        @UniqueConstraint(name = "uk_review", columnNames = {"trade_id", "reviewer_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review {
 

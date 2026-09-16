@@ -27,4 +27,26 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
             and (:viewerId is null or p.seller.id <> :viewerId)
             """)
     int incrementViewCount(long id, Long viewerId);
+
+    /** 조회수와 같은 이유로 DB 에서 더한다. 동시에 찜해도 증가분이 유실되지 않는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Product p set p.favoriteCount = p.favoriteCount + 1, p.updatedAt = p.updatedAt
+            where p.id = :id
+            """)
+    int incrementFavoriteCount(long id);
+
+    /** 0 미만으로 내려가지 않게 DB 에서 막는다. 중복 취소가 와도 음수가 되지 않는다. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Product p
+            set p.favoriteCount = case when p.favoriteCount > 0 then p.favoriteCount - 1 else 0 end,
+                p.updatedAt = p.updatedAt
+            where p.id = :id
+            """)
+    int decrementFavoriteCount(long id);
+
+    /** 증감 직후의 값만 필요할 때. 상품 전체를 다시 읽지 않는다. */
+    @Query("select p.favoriteCount from Product p where p.id = :id")
+    int findFavoriteCount(long id);
 }

@@ -13,7 +13,9 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Getter
-@Table(name = "user_regions")
+// 같은 동네를 두 번 등록할 수 없다. 재인증은 새 행이 아니라 verifyCount 증가다.
+@Table(name = "user_regions", uniqueConstraints =
+        @UniqueConstraint(name = "uk_user_region", columnNames = {"user_id", "region_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserRegion {
 

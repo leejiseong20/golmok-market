@@ -72,11 +72,12 @@ class ProductApiTest {
                 .title("원목 식탁").description("3년 사용했고 상태가 좋습니다.").price(80000).negotiable(true).build());
         product.addImage("https://example.com/first.jpg");
         product.addImage("https://example.com/second.jpg");
-        product.increaseFavoriteCount();
         product.increaseChatCount();
         product.increaseChatCount();
         favoriteRepository.save(Favorite.of(buyer, product));
         em.flush();
+        // 찜 수는 엔티티가 아니라 원자적 UPDATE 로만 바뀐다. 준비 데이터도 같은 경로를 쓴다.
+        productRepository.incrementFavoriteCount(product.getId());
         em.clear();
     }
 

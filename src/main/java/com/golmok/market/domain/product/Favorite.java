@@ -13,7 +13,10 @@ import lombok.NoArgsConstructor;
  */
 @Entity
 @Getter
-@Table(name = "favorites")
+// UNIQUE 를 엔티티에도 선언한다. 선언하지 않으면 스키마를 엔티티로 만드는 H2 테스트에만 제약이 빠져
+// 중복 찜이 테스트에서는 통과하고 운영 MySQL 에서만 터진다. (컬럼 정의는 그대로라 SQL 스키마는 변경 없음)
+@Table(name = "favorites", uniqueConstraints =
+        @UniqueConstraint(name = "uk_favorite", columnNames = {"user_id", "product_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Favorite extends BaseCreatedTimeEntity {
 

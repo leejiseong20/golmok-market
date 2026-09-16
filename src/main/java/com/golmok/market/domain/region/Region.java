@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
-@Table(name = "regions")
+@Table(name = "regions", uniqueConstraints =
+        @UniqueConstraint(name = "uk_regions_full", columnNames = {"sido", "sigungu", "dong"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Region extends BaseCreatedTimeEntity {
 
