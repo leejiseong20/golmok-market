@@ -2,6 +2,8 @@ package com.golmok.market.domain.user;
 
 import com.golmok.market.domain.product.FavoriteService;
 import com.golmok.market.domain.product.dto.ProductSummaryResponse;
+import com.golmok.market.domain.trade.TradeService;
+import com.golmok.market.domain.trade.dto.PurchaseResponse;
 import com.golmok.market.domain.user.dto.MyProfileResponse;
 import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.security.AuthUser;
@@ -19,6 +21,7 @@ public class UserController {
 
     private final UserService userService;
     private final FavoriteService favoriteService;
+    private final TradeService tradeService;
 
     @GetMapping("/me")
     public MyProfileResponse findMe(@AuthenticationPrincipal AuthUser viewer) {
@@ -32,5 +35,14 @@ public class UserController {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer size) {
         return favoriteService.findMyFavorites(viewer, cursor, size);
+    }
+
+    /** 내 구매내역. 커서는 거래 생성 시각 기준이다. */
+    @GetMapping("/me/purchases")
+    public CursorResponse<PurchaseResponse> findMyPurchases(
+            @AuthenticationPrincipal AuthUser viewer,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return tradeService.findMyPurchases(viewer, cursor, size);
     }
 }

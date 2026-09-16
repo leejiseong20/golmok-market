@@ -179,7 +179,39 @@ UPDATE products p
 SET p.favorite_count = (SELECT COUNT(*) FROM favorites f WHERE f.product_id = p.id)
 WHERE p.seller_id IN (@seller_yeoksam, @seller_seogyo, @seller_seongsu);
 
+-- ============================================================
+-- 데모 거래 (구매내역 화면용)
+--   거래 생성 API 는 채팅·결제와 함께 2단계에서 만든다. 그 전까지 화면을 볼 수 있도록
+--   구매자(@buyer) 기준으로 상태별 거래를 만들어 둔다.
+--
+--   주의 1: trades 의 active_product_id 는 생성컬럼이고 UNIQUE 다.
+--           취소/환불이 아닌 거래는 상품당 1건만 존재할 수 있으므로 상품을 겹치지 않게 고른다.
+--   주의 2: 진행 중 거래의 상품은 예약중, 확정된 거래의 상품은 판매완료여야 앞뒤가 맞는다.
+-- ============================================================
+INSERT INTO trades (product_id, chat_room_id, seller_id, buyer_id, amount, status, completed_at, created_at, updated_at)
+SELECT p.id, NULL, p.seller_id, @buyer, p.price, t.status, t.completed_at, t.created_at, t.created_at
+FROM (
+  SELECT '에어팟 프로 2세대'   AS title, 'PAID'      AS status, NULL AS completed_at, NOW() - INTERVAL 2 DAY  AS created_at
+  UNION ALL SELECT '아이패드 9세대 64GB',  'SHIPPING',  NULL,                     NOW() - INTERVAL 4 DAY
+  UNION ALL SELECT '요가매트 6mm',        'CONFIRMED', NOW() - INTERVAL 6 DAY,   NOW() - INTERVAL 9 DAY
+  UNION ALL SELECT '캠핑 의자 2개',       'CONFIRMED', NOW() - INTERVAL 12 DAY,  NOW() - INTERVAL 15 DAY
+  UNION ALL SELECT '빈티지 데님 자켓',     'CANCELED',  NULL,                     NOW() - INTERVAL 7 DAY
+) t
+JOIN products p ON p.title = t.title
+WHERE p.seller_id IN (@seller_yeoksam, @seller_seogyo, @seller_seongsu);
+
+-- 거래 상태에 맞춰 상품 상태를 맞춘다. 진행 중이면 예약중, 확정이면 판매완료.
+UPDATE products p
+JOIN trades t ON t.product_id = p.id AND t.buyer_id = @buyer
+SET p.status = CASE
+      WHEN t.status = 'CONFIRMED' THEN 'SOLD'
+      WHEN t.status IN ('REQUESTED', 'PAID', 'SHIPPING') THEN 'RESERVED'
+      ELSE p.status
+    END
+WHERE p.seller_id IN (@seller_yeoksam, @seller_seogyo, @seller_seongsu);
+
 SELECT
+  (SELECT COUNT(*) FROM trades WHERE buyer_id = @buyer) AS trades,
   (SELECT COUNT(*) FROM products WHERE seller_id IN (@seller_yeoksam, @seller_seogyo, @seller_seongsu)) AS products,
   (SELECT COUNT(*) FROM product_images pi JOIN products p ON p.id = pi.product_id
     WHERE p.seller_id IN (@seller_yeoksam, @seller_seogyo, @seller_seongsu)) AS images,

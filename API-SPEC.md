@@ -516,3 +516,57 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 7. 검색 로그 · 인기 검색어
 
 4번까지 되면 프론트 초안이 실제 데이터로 움직인다. **거기서 한 번 배포하는 것을 권장한다.**
+
+---
+
+## 8. 거래 (1단계 범위)
+
+거래 전체(요청·결제·취소·환불)는 2단계에서 채팅·결제와 함께 별도 문서로 다룬다.
+여기서는 마이페이지에 필요한 **구매내역 조회와 구매확정**만 정의한다.
+**거래를 생성하는 API는 아직 없다.** 데모 데이터는 `scripts/seed_demo_data.sql`로 넣는다.
+
+### GET `/api/users/me/purchases` — 내 구매내역
+인증 필요. 커서 페이징(정렬값: 거래 생성 시각). 최근 거래 순.
+
+```json
+{
+  "content": [
+    {
+      "tradeId": 1,
+      "status": "PAID",
+      "amount": 145000,
+      "canConfirm": true,
+      "product": {
+        "id": 44,
+        "title": "에어팟 프로 2세대",
+        "thumbnailUrl": "https://.../airpods.jpg",
+        "status": "RESERVED",
+        "deleted": false
+      },
+      "seller": { "id": 10, "nickname": "역삼이웃" },
+      "createdAt": "2026-09-14T11:52:00",
+      "completedAt": null
+    }
+  ],
+  "nextCursor": "2026-09-12T11:52:00_3",
+  "hasNext": true
+}
+```
+
+`status`: `REQUESTED` 거래요청 / `PAID` 결제완료 / `SHIPPING` 배송중 / `CONFIRMED` 구매확정 / `CANCELED` 취소 / `REFUNDED` 환불.
+
+`canConfirm`은 **지금 구매확정을 누를 수 있는지**를 서버가 계산해 준 값이다(`PAID`·`SHIPPING`에서만 `true`).
+상태 전이 규칙이 프론트와 서버 두 곳으로 갈라지지 않게 하기 위한 것이므로, 프론트는 이 값만 보고 버튼을 노출한다.
+
+**삭제된 상품의 거래도 목록에 남는다.** 구매내역은 기록이므로 판매자가 글을 내려도 사라지면 안 된다. 이때 `product.deleted`가 `true`이고 상세로 이동할 수 없다. (찜 목록은 반대로 삭제된 상품을 제외한다)
+
+### PATCH `/api/trades/{id}/confirm` — 구매확정
+인증 필요. **구매자만** 할 수 있다. 응답은 갱신된 구매내역 한 건(위 `content` 항목과 같은 형식).
+
+거래는 `CONFIRMED`가 되고 `completedAt`이 채워지며, **상품은 판매완료(`SOLD`)가 된다.**
+
+| 상황 | 응답 |
+|---|---|
+| `PAID`·`SHIPPING`이 아닌 거래 | `400 INVALID_STATE` |
+| 남의 거래 | `404 TRADE_NOT_FOUND` (존재 여부를 알려주지 않기 위해 403이 아니다) |
+| 없는 거래 | `404 TRADE_NOT_FOUND` |

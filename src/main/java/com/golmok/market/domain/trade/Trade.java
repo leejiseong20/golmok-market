@@ -4,6 +4,8 @@ import com.golmok.market.domain.chat.ChatRoom;
 import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.user.User;
 import com.golmok.market.global.entity.BaseTimeEntity;
+import com.golmok.market.global.error.BusinessException;
+import com.golmok.market.global.error.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -76,7 +78,7 @@ public class Trade extends BaseTimeEntity {
 
     public static Trade request(Product product, ChatRoom chatRoom, User buyer) {
         if (product.isOwnedBy(buyer.getId())) {
-            throw new IllegalArgumentException("자신의 상품은 구매할 수 없습니다.");
+            throw new BusinessException(ErrorCode.CANNOT_BUY_OWN_PRODUCT);
         }
         product.reserve();
         return new Trade(product, chatRoom, buyer);
@@ -86,7 +88,7 @@ public class Trade extends BaseTimeEntity {
 
     private void transitionTo(TradeStatus next) {
         if (!this.status.canTransitionTo(next)) {
-            throw new IllegalStateException(
+            throw new BusinessException(ErrorCode.INVALID_STATE,
                     "거래 상태를 %s 에서 %s 로 변경할 수 없습니다.".formatted(this.status, next));
         }
         this.status = next;

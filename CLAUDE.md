@@ -45,6 +45,7 @@
 - [검증] 2026-09-16 로컬 MySQL 8.0.44의 기존 `golmok` DB로 앱 기동 및 `ddl-auto: validate` 통과. 같은 SQL 스키마로 생성한 임시 MySQL DB에서 실제 HTTP/API 검증 30개 모두 성공: 가입·중복·로그인·재발급·로그아웃, 한글 주소 검색·근처 조회, 두 정렬의 커서 페이징, LIKE 특수문자, 이미지·찜, 삭제·없는 상품, 입력 오류·위조 토큰, 본인 조회 제외를 확인했다. 동시 상세 조회 12건의 증가분과 각 응답값이 보존됐고, `ON UPDATE`가 있는 실제 MySQL에서도 조회수 증가 시 `updated_at`·`bumped_at`은 유지됐다. 소량 데이터의 가격순 EXPLAIN은 filesort를 확인했으며 운영 규모 성능 검증은 별도다. 임시 앱·DB는 정리했고 기존 DB는 회원 0·상품 0·카테고리 7·동네 3개로 유지했다. `gradlew.bat build`도 성공(UP-TO-DATE, 기존 195개 테스트 결과 재사용). 소스 코드·스키마 수정 없음.
 - [완료] 프론트 실제 데이터 연결. 데모 시드(`scripts/seed_demo_data.sql`)로 목록·정렬·검색·상세·조회수·찜을 화면에서 확인
 - [완료] 찜하기·찜 해제 API와 마이페이지(내 정보 + 찜 목록, 커서 페이징)
+- [완료] 구매내역 조회와 구매확정. 마이페이지에 찜한 상품 / 구매내역 탭 분리
 - [다음] 첫 배포 검토. 이후 동네 인증 → 이미지 업로드·상품 CRUD → 채팅 → 알림 → 결제
 
 ## 알려진 과제
@@ -57,7 +58,9 @@
 - 상품 검색은 현재 LIKE이므로 스키마의 FULLTEXT ngram 인덱스를 사용하지 않는다. 상품 정렬 인덱스는 `status`가 정렬 컬럼보다 앞에 있는데 목록은 모든 상태를 포함하므로 filesort 회피를 보장할 수 없다. 운영 MySQL EXPLAIN·실측 후 최적화한다.
 - 상품 읽기와 찜만 구현했다. 내 판매내역(`/api/products/me`), 상품 쓰기 API, 이미지 업로드, 검색 로그 적재는 미구현이다. 조회수가 DB `INT` 범위를 넘는 규모라면 컬럼 확장을 별도로 검토한다.
 - (해결) 스키마 SQL의 UNIQUE 제약을 엔티티에도 모두 선언했다. 누락되면 `SchemaConstraintTest`가 빌드에서 잡는다. 새 테이블을 추가할 때 `@Table(uniqueConstraints = ...)`를 빠뜨리지 말 것.
-- 마이페이지는 찜 목록과 닉네임·매너온도만 보여준다. 프로필 수정(`PATCH /api/users/me`), 내 판매내역 탭은 미구현이다.
+- 마이페이지는 찜 목록·구매내역과 닉네임·매너온도만 보여준다. 프로필 수정(`PATCH /api/users/me`), 판매내역 탭은 미구현이다.
+- 거래는 조회와 구매확정만 있다. **거래를 만드는 API가 없어** 구매내역 데이터는 시드로만 생긴다. 거래 요청·결제·취소·환불은 2단계에서 채팅·결제와 함께 만든다.
+- `Review`, `ChatRoom`, `ChatMessage`는 아직 `IllegalArgumentException`/`IllegalStateException`을 던진다. 해당 도메인 구현 시 `BusinessException`으로 바꾼다. (`Product`, `Trade`는 완료)
 - 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
   로컬은 `~/.gradle/gradle.properties`(저장소 밖)에 `jwtSecret`, 필요하면 `dbPassword`를 두면 `./gradlew bootRun` 만으로 뜬다.
   bootRun 이 띄우는 JVM 은 Gradle 데몬 환경을 물려받아 셸의 `export` 가 닿지 않기 때문에, build.gradle 에서 속성을 환경변수로 넘긴다.

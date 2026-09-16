@@ -24,6 +24,11 @@ DELETE f FROM favorites f
 JOIN users u ON u.id = f.user_id
 WHERE u.email LIKE '%@golmok.test';
 
+-- 거래는 상품·회원을 참조하므로 먼저 지운다.
+DELETE t FROM trades t
+JOIN users u ON u.id = t.buyer_id OR u.id = t.seller_id
+WHERE u.email LIKE '%@golmok.test';
+
 DELETE pi FROM product_images pi
 JOIN products p ON p.id = pi.product_id
 JOIN users u ON u.id = p.seller_id
