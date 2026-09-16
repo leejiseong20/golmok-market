@@ -7,6 +7,8 @@ import com.golmok.market.domain.region.RegionRepository;
 import com.golmok.market.domain.user.User;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.domain.user.UserRole;
+import com.golmok.market.global.error.BusinessException;
+import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.security.AuthUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,5 +93,39 @@ class ProductViewCountConcurrencyTest {
     }
 
     private record Fixture(long productId, long sellerId, long buyerId) {
+    }
+
+    @Test
+    void 동시에_끌어올려도_한_요청만_성공한다() throws Exception {
+        var transaction = new TransactionTemplate(transactionManager);
+        var fixture = transaction.execute(status -> {
+            User seller = userRepository.save(User.builder().email("bump@test.com").password("hash").nickname("끌어올림판매자").build());
+            Category category = categoryRepository.save(Category.create(null, "끌어올림가구", null, 1));
+            Region region = regionRepository.save(Region.create("서울", "강남", "시간동", 37.5, 127));
+            Product product = productRepository.save(Product.builder().seller(seller).category(category).region(region)
+                    .title("동시 끌어올리기").description("중복 처리를 확인하는 상품입니다.")
+                    .bumpedAt(java.time.LocalDateTime.now().minusDays(2)).build());
+            return new Fixture(product.getId(), seller.getId(), seller.getId());
+        });
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> request = () -> {
+                ready.countDown();
+                assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
+                try {
+                    productService.bump(fixture.productId(), new AuthUser(fixture.sellerId(), UserRole.USER));
+                    return true;
+                } catch (BusinessException e) {
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_STATE);
+                    return false;
+                }
+            };
+            var first = executor.submit(request);
+            var second = executor.submit(request);
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue(); start.countDown();
+            assertThat(List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+        } finally { start.countDown(); }
     }
 }

@@ -13,7 +13,7 @@ import java.util.List;
 
 public record ProductDetailResponse(
         Long id, String title, String description, int price, boolean isNegotiable,
-        ProductStatus status, TradeType tradeType, Long categoryId, String categoryName, String regionName,
+        ProductStatus status, TradeType tradeType, Long categoryId, String categoryName, Long regionId, String regionName,
         List<ImageInfo> images, SellerInfo seller, int viewCount, int favoriteCount, int chatCount,
         boolean isLiked, boolean isMine,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime createdAt
@@ -29,7 +29,7 @@ public record ProductDetailResponse(
         User seller = product.getSeller();
         return new ProductDetailResponse(product.getId(), product.getTitle(), product.getDescription(), product.getPrice(),
                 product.isNegotiable(), product.getStatus(), product.getTradeType(), product.getCategory().getId(),
-                product.getCategory().getName(), product.getRegion().getDong(),
+                product.getCategory().getName(), product.getRegion().getId(), product.getRegion().getDong(),
                 images.stream().map(image -> new ImageInfo(image.getId(), image.getImageUrl(), image.getSortOrder())).toList(),
                 new SellerInfo(seller.getId(), seller.getNickname(), seller.getProfileImageUrl(), seller.getMannerTemp()),
                 product.getViewCount(), product.getFavoriteCount(), product.getChatCount(), isLiked, isMine, product.getCreatedAt());

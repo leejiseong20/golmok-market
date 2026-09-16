@@ -1,5 +1,6 @@
 package com.golmok.market.domain.trade;
 
+import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.product.ProductThumbnails;
 import com.golmok.market.domain.trade.dto.PurchaseResponse;
 import com.golmok.market.global.error.BusinessException;
@@ -30,6 +31,7 @@ public class TradeService {
 
     private final TradeRepository tradeRepository;
     private final ProductThumbnails productThumbnails;
+    private final ProductRepository productRepository;
 
     public CursorResponse<PurchaseResponse> findMyPurchases(AuthUser viewer, String rawCursor, Integer size) {
         Cursor cursor = Cursor.parse(rawCursor);
@@ -56,6 +58,10 @@ public class TradeService {
      */
     @Transactional
     public PurchaseResponse confirm(long tradeId, AuthUser viewer) {
+        long productId = tradeRepository.findProductIdForBuyer(tradeId, viewer.id())
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRADE_NOT_FOUND));
+        productRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
         Trade trade = tradeRepository.findWithProduct(tradeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRADE_NOT_FOUND));
         if (!trade.getBuyer().getId().equals(viewer.id())) {

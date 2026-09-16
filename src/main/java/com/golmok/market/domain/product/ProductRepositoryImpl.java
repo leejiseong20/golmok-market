@@ -21,6 +21,28 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     private final EntityManager em;
 
     @Override
+    public List<Product> findMyPage(long sellerId, ProductStatus status, Cursor cursor, PageSize pageSize) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery<Product> query = cb.createQuery(Product.class);
+        Root<Product> product = query.from(Product.class);
+        product.fetch("seller");
+        product.fetch("category");
+        product.fetch("region");
+        List<Predicate> conditions = new ArrayList<>();
+        conditions.add(cb.equal(product.get("seller").get("id"), sellerId));
+        conditions.add(cb.isNull(product.get("deletedAt")));
+        if (status != null) conditions.add(cb.equal(product.get("status"), status));
+        if (cursor != null) {
+            LocalDateTime time = cursor.valueAsDateTime();
+            conditions.add(cb.or(cb.lessThan(product.get("createdAt"), time),
+                    cb.and(cb.equal(product.get("createdAt"), time), cb.lessThan(product.get("id"), cursor.id()))));
+        }
+        query.select(product).where(conditions.toArray(Predicate[]::new))
+                .orderBy(cb.desc(product.get("createdAt")), cb.desc(product.get("id")));
+        return em.createQuery(query).setMaxResults(pageSize.fetchSize()).getResultList();
+    }
+
+    @Override
     public List<Product> findPage(long regionId, Long categoryId, String keyword, ProductSort sort, Cursor cursor, PageSize pageSize) {
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Product> query = cb.createQuery(Product.class);

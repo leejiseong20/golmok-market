@@ -36,7 +36,7 @@ public class Product extends BaseTimeEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
-    /** 등록 시점의 동네. 판매자가 이사해도 이 값은 바뀌지 않는다. */
+    /** 대표 동네 변경에는 영향받지 않는다. 명시적 수정 시 인증한 동네로 옮길 수 있다. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "region_id")
     private Region region;
@@ -92,7 +92,7 @@ public class Product extends BaseTimeEntity {
     @Builder
     private Product(User seller, Category category, Region region,
                     String title, String description, int price,
-                    boolean negotiable, TradeType tradeType) {
+                    boolean negotiable, TradeType tradeType, LocalDateTime bumpedAt) {
         this.seller = seller;
         this.category = category;
         this.region = region;
@@ -102,7 +102,7 @@ public class Product extends BaseTimeEntity {
         this.negotiable = negotiable;
         this.tradeType = tradeType != null ? tradeType : TradeType.DIRECT;
         this.status = ProductStatus.ON_SALE;
-        this.bumpedAt = LocalDateTime.now();
+        this.bumpedAt = bumpedAt != null ? bumpedAt : LocalDateTime.now();
     }
 
     // ---------- 이미지 ----------
@@ -126,11 +126,15 @@ public class Product extends BaseTimeEntity {
     // ---------- 수정 ----------
 
     public void update(String title, String description, int price,
-                       Category category, boolean negotiable, TradeType tradeType) {
+                       Category category, Region region, boolean negotiable, TradeType tradeType) {
+        if (this.status == ProductStatus.SOLD) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "판매완료 상품은 수정할 수 없습니다.");
+        }
         this.title = title;
         this.description = description;
         this.price = price;
         this.category = category;
+        this.region = region;
         this.negotiable = negotiable;
         this.tradeType = tradeType;
     }
@@ -169,15 +173,18 @@ public class Product extends BaseTimeEntity {
 
     // ---------- 끌어올리기 ----------
 
-    public void bump() {
-        if (!canBump()) {
+    public void bump(LocalDateTime now) {
+        if (this.status == ProductStatus.SOLD) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "판매완료 상품은 끌어올릴 수 없습니다.");
+        }
+        if (!canBump(now)) {
             throw new BusinessException(ErrorCode.INVALID_STATE, "끌어올리기는 24시간에 한 번만 가능합니다.");
         }
-        this.bumpedAt = LocalDateTime.now();
+        this.bumpedAt = now;
     }
 
-    public boolean canBump() {
-        return this.bumpedAt.plusHours(BUMP_COOLDOWN_HOURS).isBefore(LocalDateTime.now());
+    public boolean canBump(LocalDateTime now) {
+        return this.status != ProductStatus.SOLD && !now.isBefore(this.bumpedAt.plusHours(BUMP_COOLDOWN_HOURS));
     }
 
     // ---------- 카운터 ----------

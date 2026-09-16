@@ -350,6 +350,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
   "tradeType": "DIRECT",
   "categoryId": 2,
   "categoryName": "가구",
+  "regionId": 1,
   "regionName": "역삼동",
   "images": [
     { "id": 1, "imageUrl": "https://.../1.jpg", "sortOrder": 0 }
@@ -391,7 +392,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
   "regionId": 1,
   "isNegotiable": true,
   "tradeType": "DIRECT",
-  "imageUrls": ["https://.../1.jpg", "https://.../2.jpg"]
+  "imageUrls": ["/api/images/2026/09/16/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg"]
 }
 ```
 → `201 Created`, 상세 응답과 동일한 본문.
@@ -399,13 +400,31 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 검증: 제목 2~100자, 본문 10자 이상, 가격 0 이상, 이미지 1~10장.
 `regionId`는 **본인이 인증한 동네여야 한다.** 아니면 `403`.
 
+모든 필드는 필수다(`isNegotiable`, `tradeType` 포함). 제목·본문은 앞뒤 공백을 제거한 뒤 검증한다.
+가격은 정수 `0~2147483647`, 카테고리·동네 ID는 양수다. 입력 검증 실패는 `400 INVALID_INPUT`과 `errors`를 반환한다.
+존재하지 않는 카테고리는 `404 CATEGORY_NOT_FOUND`, 인증하지 않은 동네는 `403 REGION_NOT_VERIFIED`다.
+이미지는 업로드 응답의 상대 경로(`/api/images/yyyy/MM/dd/UUID.jpg|png|webp`)만 허용한다.
+외부 URL, 쿼리·프래그먼트, 인코딩·상위 경로 이동, 저장 디렉터리 밖을 가리키는 링크, 존재하지 않거나 읽을 수 없는 파일은 `400 INVALID_IMAGE_URL`이다.
+파일 소유권은 업로더 메타데이터가 없어 확인하지 않는다. 이미지 순서는 배열 순서이며 첫 이미지가 썸네일이다.
+상품 쓰기 응답은 조회수를 증가시키지 않는다.
+
 ---
 
 ### PUT `/api/products/{id}` — 상품 수정
 본인만 가능. 등록과 동일한 본문. `SOLD` 상태면 `400`.
 
+→ `200 OK`, 갱신된 상품 상세 응답. 상세에는 `regionId`가 포함된다.
+수정 시에도 현재 인증한 동네만 선택할 수 있다. 대표 동네를 바꾸는 것만으로 기존 상품 지역이 바뀌지는 않는다.
+이미지 배열 전체를 교체하고 DB의 이전 이미지 행은 제거한다. 디스크 파일은 즉시 지우지 않는다.
+데모 상품의 기존 외부 이미지는 조회할 수 있지만 수정할 때는 새로 업로드한 이미지로 교체해야 한다.
+`viewCount`, `favoriteCount`, 등록 시각과 끌어올리기 시각은 수정으로 바뀌지 않는다.
+
 ### DELETE `/api/products/{id}` — 상품 삭제
 본인만 가능. soft delete. → `204 No Content`
+
+판매완료 상품도 삭제할 수 있다. 상품 행·거래 기록·디스크 이미지 파일은 보존한다.
+삭제 후 목록·판매내역·상세에서 제외한다. 없는 상품·이미 삭제한 상품의 쓰기는 `404 PRODUCT_NOT_FOUND`, 타인의 상품 쓰기는 `403 FORBIDDEN`이다.
+등록 외 수정·삭제·상태 변경·끌어올리기의 상품 ID가 0 이하이거나 형식이 틀리면 `400 INVALID_INPUT`이다.
 
 ### PATCH `/api/products/{id}/status` — 상태 변경
 ```json
@@ -414,14 +433,27 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 허용 전이: `ON_SALE ↔ RESERVED`, `→ SOLD`.
 역방향(`SOLD → ON_SALE`)은 `400`.
 
+인증된 본인만 가능. → `200 OK`, 갱신된 상품 상세 응답.
+같은 상태로의 요청과 `SOLD → RESERVED`도 `400 INVALID_STATE`다. 지원하지 않거나 누락된 상태는 `400 INVALID_INPUT`이다.
+상품의 표시 상태만 바꾸며 거래 생성·결제·구매확정을 대신하지 않는다.
+
 ### POST `/api/products/{id}/bump` — 끌어올리기
 본인만 가능. 마지막 끌어올리기로부터 24시간 미경과 시 `400`.
+
+최초 등록 시각부터 24시간을 계산한다. 정확히 24시간 경과한 순간부터 가능하다.
+`ON_SALE`·`RESERVED`만 허용하며 판매완료 또는 시간 미경과는 `400 INVALID_STATE`다.
+동시 요청은 상품 행을 잠가 검사하므로 같은 시점의 중복 끌어올리기는 하나만 성공한다. 성공은 `200 OK`다.
 ```json
 { "bumpedAt": "2026-09-14T20:10:00" }
 ```
 
 ### GET `/api/products/me?status=` — 내 판매내역
 인증 필요. `status`로 필터(`ON_SALE`/`RESERVED`/`SOLD`). 커서 페이징.
+
+`status` 생략 시 전체 상태를 포함한다. 삭제한 상품은 제외한다. 지원하지 않는 상태는 `400 INVALID_INPUT`이다.
+`createdAt DESC, id DESC` 순으로 조회하며 끌어올리기는 판매내역의 순서를 바꾸지 않는다.
+`cursor`, `size`는 공통 규약을 따르고 응답은 상품 목록의 `CursorResponse<ProductSummaryResponse>`와 같다.
+본인 상품이므로 `isLiked`는 항상 `false`다. 빈 결과는 `content: []`, `nextCursor: null`, `hasNext: false`다.
 
 ---
 
@@ -458,7 +490,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 `multipart/form-data`, 필드명 `files` (복수 허용).
 ```json
 // 201 Created
-{ "imageUrls": ["https://.../abc.jpg", "https://.../def.jpg"] }
+{ "imageUrls": ["/api/images/2026/09/16/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg"] }
 ```
 
 인증 필요. 한 번에 최대 10장, 장당 5MB 이하.
@@ -608,6 +640,10 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 인증 필요. **구매자만** 할 수 있다. 응답은 갱신된 구매내역 한 건(위 `content` 항목과 같은 형식).
 
 거래는 `CONFIRMED`가 되고 `completedAt`이 채워지며, **상품은 판매완료(`SOLD`)가 된다.**
+
+판매자가 먼저 상품을 `SOLD`로 표시했더라도 거래가 `PAID`·`SHIPPING`이면 구매확정은 가능하다.
+상품 표시와 구매자의 수령 확인은 별개이므로 이미 판매완료인 상품은 그대로 유지한다.
+상품 → 거래 순서로 잠금을 잡아 상품 쓰기·중복 구매확정과의 동시 충돌을 막는다.
 
 | 상황 | 응답 |
 |---|---|

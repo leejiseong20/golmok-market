@@ -150,7 +150,7 @@ class ProductServiceTest {
         deleted.softDelete();
         Category otherCategory = categoryRepository.save(Category.create(null, "기타", null, 2));
         Product wrongCategory = save("원목 다른카테고리", 100);
-        wrongCategory.update(wrongCategory.getTitle(), wrongCategory.getDescription(), 100, otherCategory, false, TradeType.DIRECT);
+        wrongCategory.update(wrongCategory.getTitle(), wrongCategory.getDescription(), 100, otherCategory, region, false, TradeType.DIRECT);
         Region otherRegion = regionRepository.save(Region.create("서울특별시", "마포구", "서교동", 37.55, 126.92));
         productRepository.save(Product.builder().seller(seller).category(category).region(otherRegion)
                 .title("원목 다른동네").description("다른 동네의 상품입니다.").price(100).build());
@@ -290,7 +290,7 @@ class ProductServiceTest {
         Product product = save("이전제목", 100);
         em.flush();
         jdbc.update("update products set view_count = view_count + 5 where id = ?", product.getId());
-        product.update("수정제목", product.getDescription(), 200, category, false, TradeType.DIRECT);
+        product.update("수정제목", product.getDescription(), 200, category, region, false, TradeType.DIRECT);
         reload();
         assertThat(productRepository.findById(product.getId()).orElseThrow().getViewCount()).isEqualTo(5);
     }

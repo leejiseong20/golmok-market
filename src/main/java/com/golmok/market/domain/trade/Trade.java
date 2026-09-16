@@ -2,6 +2,7 @@ package com.golmok.market.domain.trade;
 
 import com.golmok.market.domain.chat.ChatRoom;
 import com.golmok.market.domain.product.Product;
+import com.golmok.market.domain.product.ProductStatus;
 import com.golmok.market.domain.user.User;
 import com.golmok.market.global.entity.BaseTimeEntity;
 import com.golmok.market.global.error.BusinessException;
@@ -105,7 +106,10 @@ public class Trade extends BaseTimeEntity {
     public void confirm() {
         transitionTo(TradeStatus.CONFIRMED);
         this.completedAt = LocalDateTime.now();
-        this.product.markSold();
+        // 판매자가 먼저 판매완료로 표시했어도 구매자의 수령 확인은 별개다.
+        if (this.product.getStatus() != ProductStatus.SOLD) {
+            this.product.markSold();
+        }
     }
 
     public void cancel(String reason) {

@@ -87,6 +87,17 @@ class TradeApiTest {
     // ---------- 구매내역 ----------
 
     @Test
+    void 판매자가_먼저_판매완료해도_구매확정은_가능하다() throws Exception {
+        Trade trade = paidTrade("수동 판매완료");
+        trade.getProduct().markSold();
+        em.flush(); em.clear();
+        mockMvc.perform(patch("/api/trades/{id}/confirm", trade.getId())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + buyerToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.product.status").value("SOLD"));
+    }
+
+    @Test
     void 구매내역은_거래와_상품_판매자_정보를_준다() throws Exception {
         Trade trade = trade("원목 식탁");
         em.clear();

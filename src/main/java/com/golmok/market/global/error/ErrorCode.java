@@ -44,6 +44,9 @@ public enum ErrorCode {
 
     // ---------- 상품 ----------
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
+    REGION_NOT_VERIFIED(HttpStatus.FORBIDDEN, "인증한 동네에서만 상품을 등록하거나 수정할 수 있습니다."),
+    INVALID_IMAGE_URL(HttpStatus.BAD_REQUEST, "사진을 다시 업로드해 주세요. 서버에 저장된 이미지 경로만 사용할 수 있습니다."),
 
     // ---------- 회원 · 찜 ----------
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),

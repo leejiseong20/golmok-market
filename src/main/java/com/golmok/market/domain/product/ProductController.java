@@ -2,6 +2,12 @@ package com.golmok.market.domain.product;
 
 import com.golmok.market.domain.product.dto.ProductDetailResponse;
 import com.golmok.market.domain.product.dto.ProductSummaryResponse;
+import com.golmok.market.domain.product.dto.ProductWriteRequest;
+import com.golmok.market.domain.product.dto.ProductStatusRequest;
+import com.golmok.market.domain.product.dto.ProductBumpResponse;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.security.AuthUser;
 import jakarta.validation.constraints.Positive;
@@ -23,6 +29,45 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductController {
 
     private final ProductService productService;
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProductDetailResponse create(@Valid @RequestBody ProductWriteRequest request,
+                                        @AuthenticationPrincipal AuthUser viewer) {
+        return productService.create(request, viewer);
+    }
+
+    @PutMapping("/{id}")
+    public ProductDetailResponse update(@PathVariable @Positive long id,
+                                        @Valid @RequestBody ProductWriteRequest request,
+                                        @AuthenticationPrincipal AuthUser viewer) {
+        return productService.update(id, request, viewer);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable @Positive long id, @AuthenticationPrincipal AuthUser viewer) {
+        productService.delete(id, viewer);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ProductDetailResponse changeStatus(@PathVariable @Positive long id,
+                                              @Valid @RequestBody ProductStatusRequest request,
+                                              @AuthenticationPrincipal AuthUser viewer) {
+        return productService.changeStatus(id, request.status(), viewer);
+    }
+
+    @PostMapping("/{id}/bump")
+    public ProductBumpResponse bump(@PathVariable @Positive long id, @AuthenticationPrincipal AuthUser viewer) {
+        return productService.bump(id, viewer);
+    }
+
+    @GetMapping("/me")
+    public CursorResponse<ProductSummaryResponse> findMyPage(@AuthenticationPrincipal AuthUser viewer,
+            @RequestParam(required = false) ProductStatus status,
+            @RequestParam(required = false) String cursor, @RequestParam(required = false) Integer size) {
+        return productService.findMyPage(viewer, status, cursor, size);
+    }
 
     @InitBinder
     void trimStrings(WebDataBinder binder) {

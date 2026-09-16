@@ -1,7 +1,9 @@
 package com.golmok.market.domain.trade;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
@@ -35,7 +37,11 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
             """)
     List<Trade> findPurchasesAfter(long buyerId, LocalDateTime cursorTime, long cursorId, Pageable pageable);
 
-    /** 구매확정은 상품 상태까지 바꾸므로 상품을 함께 읽는다. */
+    @Query("select t.product.id from Trade t where t.id = :id and t.buyer.id = :buyerId")
+    Optional<Long> findProductIdForBuyer(long id, long buyerId);
+
+    /** 상품 잠금을 먼저 잡은 뒤 거래를 잠근다. 다른 상품 쓰기와 잠금 순서를 통일한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Trade t join fetch t.product where t.id = :id")
     Optional<Trade> findWithProduct(long id);
 }
