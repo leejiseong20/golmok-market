@@ -3,6 +3,7 @@ package com.golmok.market.domain.user;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRegionRepository extends JpaRepository<UserRegion, Long> {
@@ -14,4 +15,17 @@ public interface UserRegionRepository extends JpaRepository<UserRegion, Long> {
             where ur.user.id = :userId and ur.primary = true
             """)
     Optional<UserRegion> findPrimaryWithRegion(Long userId);
+
+    /** 내 동네 목록. 대표 동네를 먼저, 그다음 최근 인증 순. */
+    @Query("""
+            select ur from UserRegion ur
+            join fetch ur.region
+            where ur.user.id = :userId
+            order by ur.primary desc, ur.verifiedAt desc, ur.id desc
+            """)
+    List<UserRegion> findAllWithRegion(long userId);
+
+    Optional<UserRegion> findByUserIdAndRegionId(long userId, long regionId);
+
+    long countByUserId(long userId);
 }

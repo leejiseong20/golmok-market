@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserRegionService userRegionService;
 
     /**
      * 토큰은 유효하지만 사용자가 없는 경우(탈퇴 후 물리 삭제 등)도 404 로 처리한다.
@@ -21,7 +22,7 @@ public class UserService {
      */
     public MyProfileResponse findMe(AuthUser viewer) {
         return userRepository.findById(viewer.id())
-                .map(MyProfileResponse::from)
+                .map(user -> MyProfileResponse.from(user, userRegionService.findMyRegions(user.getId())))
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 }

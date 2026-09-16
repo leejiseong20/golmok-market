@@ -50,6 +50,11 @@ public enum ErrorCode {
     CANNOT_FAVORITE_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 찜할 수 없습니다."),
     ALREADY_FAVORITED(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
 
+    // ---------- 동네 ----------
+    REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "동네를 찾을 수 없습니다."),
+    USER_REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "인증하지 않은 동네입니다."),
+    REGION_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "동네는 최대 2개까지 인증할 수 있습니다."),
+
     // ---------- 거래 ----------
     TRADE_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다."),
     CANNOT_BUY_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 구매할 수 없습니다.");

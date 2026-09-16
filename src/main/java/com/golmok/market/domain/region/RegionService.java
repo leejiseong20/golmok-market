@@ -33,6 +33,26 @@ public class RegionService {
     }
 
     public List<RegionResponse> findNearby(double lat, double lng) {
+        return nearest(lat, lng, NEARBY_LIMIT).stream()
+                .map(candidate -> RegionResponse.from(candidate.region()))
+                .toList();
+    }
+
+    /**
+     * 동네 인증용. 좌표에서 가장 가까운 동네 하나를 준다.
+     *
+     * 반경 제한을 두지 않는다. 실제 서비스라면 "그 동네 근처에 있을 때만 인증"이 맞지만,
+     * 지금 regions 에는 동네가 3개뿐이라 반경을 걸면 대부분의 좌표가 인증에 실패한다.
+     * 동네 데이터를 실제로 채울 때 반경 제한을 도입한다.
+     */
+    public Region findNearest(double lat, double lng) {
+        return nearest(lat, lng, 1).stream()
+                .findFirst()
+                .map(DistanceToRegion::region)
+                .orElseThrow(() -> new BusinessException(ErrorCode.REGION_NOT_FOUND));
+    }
+
+    private List<DistanceToRegion> nearest(double lat, double lng, int limit) {
         if (!Double.isFinite(lat) || !Double.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
@@ -47,13 +67,13 @@ public class RegionService {
                     .filter(candidate -> wholeWorld || candidate.kilometers() <= currentRadius)
                     .sorted(Comparator.comparingDouble(DistanceToRegion::kilometers)
                             .thenComparing(candidate -> candidate.region().getId()))
-                    .limit(NEARBY_LIMIT)
+                    .limit(limit)
                     .toList();
 
-            // 사각형 후보가 10개인 것만으로 끝내면 모서리보다 가까운 바깥 동네를 놓칠 수 있다.
-            // 실제 원 안에 10개가 있으면 원 밖의 어떤 동네도 상위 10개에 들 수 없다.
-            if (wholeWorld || nearest.size() == NEARBY_LIMIT) {
-                return nearest.stream().map(candidate -> RegionResponse.from(candidate.region())).toList();
+            // 사각형 후보가 limit 개인 것만으로 끝내면 모서리보다 가까운 바깥 동네를 놓칠 수 있다.
+            // 실제 원 안에 limit 개가 있으면 원 밖의 어떤 동네도 상위 limit 개에 들 수 없다.
+            if (wholeWorld || nearest.size() == limit) {
+                return nearest;
             }
             radius = Math.min(radius * RADIUS_MULTIPLIER, GeoDistance.MAX_DISTANCE_KM);
         }

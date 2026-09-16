@@ -213,12 +213,14 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
   "id": 1,
   "nickname": "골목이",
   "profileImageUrl": null,
-  "mannerTemp": 36.5
+  "mannerTemp": 36.5,
+  "regions": [
+    { "id": 1, "name": "역삼동", "isPrimary": true, "verifyCount": 3 }
+  ]
 }
 ```
 
-`email`과 인증 동네(`regions`)는 아직 내려주지 않는다. 동네 인증 API가 없어 `regions`가 항상 빈 배열이 되는데,
-그러면 프론트가 "인증한 동네가 없다"와 "기능이 아직 없다"를 구분할 수 없다. 동네 인증과 함께 추가한다.
+`email`은 화면에서 쓰지 않아 내려주지 않는다. `regions`의 `id`는 **동네(region) id**다(아래 삭제·대표 지정 경로에 그대로 쓴다).
 
 ### PATCH `/api/users/me` — 프로필 수정
 ```json
@@ -238,14 +240,37 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 ```
 
 ### POST `/api/users/me/regions` — 동네 인증
+인증 필요.
 ```json
+// Request
 { "lat": 37.5006, "lng": 127.0366 }
 ```
-좌표로 가장 가까운 `region`을 찾아 등록. 이미 등록된 동네면 `verifyCount`만 증가.
-최대 2개. 3개째 시도하면 `409`.
+```json
+// 200 OK — 갱신된 내 동네 전체
+[
+  { "id": 1, "name": "역삼동", "isPrimary": true, "verifyCount": 1 },
+  { "id": 2, "name": "서교동", "isPrimary": false, "verifyCount": 1 }
+]
+```
 
 ### DELETE `/api/users/me/regions/{regionId}` — 동네 삭제
 ### PATCH `/api/users/me/regions/{regionId}/primary` — 대표 동네 지정
+
+**세 API 모두 갱신된 내 동네 목록 전체를 돌려준다.** 대표를 옮기면 두 행이 한 번에 바뀌므로, 화면이 부분 갱신을 조합하지 않아도 되게 했다.
+
+| 정책 | 동작 |
+|---|---|
+| 좌표 → 동네 | 가장 가까운 동네 1개로 인증 |
+| 재인증 | 이미 인증한 동네면 행을 늘리지 않고 `verifyCount`만 +1 |
+| 개수 제한 | 최대 2개. 3개째는 `409 REGION_LIMIT_EXCEEDED` (기존 동네 재인증은 2개여도 허용) |
+| 첫 동네 | 자동으로 대표가 된다 |
+| 대표 삭제 | 남은 동네가 자동으로 대표로 승격. 마지막 하나를 지우면 동네 없음 |
+| 인증하지 않은 동네 삭제·대표 지정 | `404 USER_REGION_NOT_FOUND` |
+| 좌표 범위 밖·누락 | `400 INVALID_INPUT` (`errors[].field`는 `lat` 또는 `lng`) |
+
+**인증 반경 제한은 두지 않는다.** 실제 서비스라면 "그 동네 근처에 있을 때만" 인증이 맞지만, 지금 `regions`에는 동네가 3개뿐이라 반경을 걸면 대부분의 좌표가 인증에 실패해 개발·시연이 불가능하다. 동네 데이터를 실제로 채울 때 도입한다.
+
+프론트는 **브라우저 위치로만** 인증한다. 동네 이름을 골라 인증하게 하면 가보지도 않은 동네를 등록할 수 있어 동네 인증이라는 장치가 의미를 잃는다.
 
 ---
 
