@@ -7,7 +7,7 @@
 
 - Spring Boot 4.1.1 / Java 21 / Gradle
 - MySQL 8.0 (운영), H2 인메모리 (테스트)
-- React + Vite (별도 저장소, 현재 초안 단계)
+- React + Vite — 별도 저장소 [golmok-market-frontend](https://github.com/leejiseong20/golmok-market-frontend). 실제 API와 연동돼 동작한다(목업 없음).
 
 ## 작업 규칙
 
