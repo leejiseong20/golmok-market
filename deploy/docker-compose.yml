@@ -1,5 +1,5 @@
 # ============================================================
-# 운영 구성: EC2 한 대에 MySQL · 백엔드 · Caddy(HTTPS)
+# 운영 구성: 서버 한 대(Oracle Cloud 상시 무료)에 MySQL · 백엔드 · Caddy(HTTPS)
 #
 # 실행:  cd deploy && docker compose up -d
 # 값:    같은 폴더의 .env (deploy/.env.example 을 복사해 채운다. 커밋 금지)

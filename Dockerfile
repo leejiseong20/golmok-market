@@ -5,10 +5,15 @@
 # 최종 이미지는 JRE 와 jar 만 담아 크기와 공격 표면을 줄인다.
 #
 # 빌드는 GitHub Actions 에서 한다(.github/workflows/docker-image.yml).
-# 배포 서버(EC2 t3.micro, 메모리 1GB)에서 Gradle 빌드를 돌리면 메모리가 부족해 매우 느리거나 실패한다.
+# 작은 배포 서버에서 Gradle 빌드를 돌리면 메모리가 부족해 매우 느리거나 실패한다.
+#
+# x86(amd64)과 ARM(arm64) 두 종류로 만든다. Oracle Cloud 상시 무료의 주력 서버가 ARM 이다.
 # ============================================================
 
-FROM eclipse-temurin:21-jdk AS build
+# --platform=$BUILDPLATFORM: 빌드 단계는 CI 러너(x86)에서 한 번만 실행한다.
+# 지정하지 않으면 ARM 이미지를 만들 때 Gradle 빌드 전체가 에뮬레이션으로 돌아 수십 분이 걸린다.
+# jar 는 CPU 종류와 무관하므로 한 번 만든 것을 두 이미지가 함께 쓴다.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
 # 의존성 목록이 바뀌지 않으면 이 레이어를 캐시에서 재사용한다. 소스만 고쳤을 때 재다운로드를 피한다.
@@ -33,7 +38,8 @@ COPY --from=build /workspace/build/libs/golmok-market.jar app.jar
 
 USER golmok
 
-# 메모리 1GB 서버에서 MySQL 과 함께 돌리므로 힙을 명시적으로 제한한다.
+# 가장 작은 서버(메모리 1GB, Oracle 무료 x86)에서도 MySQL 과 함께 돌 수 있게 힙을 명시적으로 제한한다.
+# 메모리가 넉넉한 ARM 서버에서도 시연 규모에는 이 설정으로 충분하다.
 # 제한하지 않으면 JVM 이 서버 메모리 비율로 힙을 잡아 MySQL 과 경쟁하다 OOM 으로 죽을 수 있다.
 # SerialGC: 코어 1~2개·작은 힙에서는 병렬 GC 의 스레드 비용이 이득보다 크다.
 # 힙만 제한하면 부족하다. 실측에서 힙 320MB 제한인데 프로세스는 460MB 를 썼다.
