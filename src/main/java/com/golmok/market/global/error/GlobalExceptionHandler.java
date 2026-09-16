@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -96,6 +97,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         return respond(ErrorCode.METHOD_NOT_ALLOWED, ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED));
+    }
+
+    /**
+     * 업로드 용량 초과. 서블릿이 요청 파싱 단계에서 던지므로 컨트롤러에 닿지 않는다.
+     * 기본 처리에 맡기면 500 이 나가는데, 사용자가 고칠 수 있는 문제이므로 400 으로 돌린다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadSize(MaxUploadSizeExceededException e) {
+        log.info("업로드 용량 초과: {}", e.getMessage());
+        return respond(ErrorCode.IMAGE_TOO_LARGE, ErrorResponse.of(ErrorCode.IMAGE_TOO_LARGE));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)

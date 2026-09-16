@@ -50,6 +50,10 @@ public enum ErrorCode {
     CANNOT_FAVORITE_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 찜할 수 없습니다."),
     ALREADY_FAVORITED(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
 
+    // ---------- 이미지 ----------
+    UNSUPPORTED_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 이미지만 올릴 수 있습니다."),
+    IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지는 장당 5MB 이하여야 합니다."),
+
     // ---------- 동네 ----------
     REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "동네를 찾을 수 없습니다."),
     USER_REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "인증하지 않은 동네입니다."),

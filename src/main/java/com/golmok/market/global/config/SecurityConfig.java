@@ -63,6 +63,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/reissue").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-email", "/api/auth/check-nickname").permitAll()
 
+                        // 업로드한 이미지 파일. 목록·상세에서 비로그인도 봐야 한다.
+                        .requestMatchers(HttpMethod.GET, "/api/images/**").permitAll()
+
                         // 비로그인 사용자도 둘러볼 수 있는 조회 API
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products", "/api/products/*",

@@ -39,3 +39,6 @@ out/
 ### Secrets ###
 .env
 application-local.yml
+
+### 업로드 파일 ###
+uploads/

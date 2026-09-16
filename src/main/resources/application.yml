@@ -37,3 +37,14 @@ cors:
   # 프론트를 127.0.0.1:5173 으로 열면 localhost 만 허용된 설정에서는 로그인(POST)이 403 이 된다.
   # (GET 은 Origin 이 없어 통과해서, 목록은 되는데 로그인만 안 되는 형태로 나타난다.)
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+
+app:
+  image:
+    # 로컬 디스크. 배포 시 볼륨을 붙이거나 S3 로 옮겨야 한다.
+    upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
+    max-count: 10
+
+spring.servlet.multipart:
+  max-file-size: 5MB
+  # 10장 * 5MB + 여유. 요청 전체 한도를 두지 않으면 큰 요청 하나로 메모리를 밀어낼 수 있다.
+  max-request-size: 55MB

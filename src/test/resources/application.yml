@@ -28,3 +28,12 @@ jwt:
 
 cors:
   allowed-origins: http://localhost:5173,http://127.0.0.1:5173
+
+app:
+  image:
+    upload-dir: build/test-uploads
+    max-count: 10
+
+spring.servlet.multipart:
+  max-file-size: 5MB
+  max-request-size: 55MB
