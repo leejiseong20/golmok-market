@@ -9,6 +9,11 @@
 --   - search_logs, refresh_tokens 테이블 추가
 -- ============================================================
 
+-- 이 파일을 읽는 클라이언트의 문자셋을 고정한다.
+-- 없으면 실행 환경의 기본값을 따르는데, MySQL Docker 이미지의 초기화 스크립트는 latin1 로 읽어
+-- 아래 초기 데이터의 한글(카테고리·동네 이름)이 이중 인코딩돼 깨진 채 저장된다.
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS golmok
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;

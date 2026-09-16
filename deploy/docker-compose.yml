@@ -1,0 +1,76 @@
+# ============================================================
+# 운영 구성: EC2 한 대에 MySQL · 백엔드 · Caddy(HTTPS)
+#
+# 실행:  cd deploy && docker compose up -d
+# 값:    같은 폴더의 .env (deploy/.env.example 을 복사해 채운다. 커밋 금지)
+#
+# 외부에 여는 포트는 Caddy 의 80/443 뿐이다.
+# MySQL(3306)과 백엔드(8080)는 ports 를 두지 않아 컨테이너 네트워크 안에서만 접근된다.
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 를 .env 에 설정하세요}
+      MYSQL_DATABASE: golmok
+      MYSQL_USER: ${DB_USERNAME:?DB_USERNAME 을 .env 에 설정하세요}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
+      TZ: Asia/Seoul
+    # 메모리 1GB 서버용 최소 설정. 기본값(버퍼 풀·performance_schema)은 MySQL 혼자 수백 MB 를 쓴다.
+    command:
+      - --innodb-buffer-pool-size=128M
+      - --performance-schema=OFF
+      - --max-connections=40
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 데이터 볼륨이 비어 있는 첫 기동 때만 실행된다. 스키마 파일을 복사하지 않고 원본을 그대로 쓴다.
+      - ../golmok_schema_v2.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    image: ${APP_IMAGE:-ghcr.io/leejiseong20/golmok-market:latest}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/golmok?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 을 .env 에 설정하세요}
+      # Vercel 을 거쳐도 브라우저의 Origin(Vercel 주소)이 그대로 전달된다.
+      # 빠뜨리면 목록 조회는 되는데 로그인(POST)만 403 이 난다.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS 를 .env 에 설정하세요}
+    volumes:
+      # 업로드 이미지. 컨테이너를 새 이미지로 교체해도 볼륨은 남는다.
+      - uploads:/data/uploads
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 발급받은 인증서. 지우면 재발급을 반복하다 Let's Encrypt 발급 한도에 걸린다.
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  mysql-data:
+  uploads:
+  caddy-data:
+  caddy-config:

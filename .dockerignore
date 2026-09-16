@@ -1,0 +1,12 @@
+# 이미지 빌드에 필요 없는 것. 특히 로컬 빌드 산출물·업로드 파일·비밀값이 이미지에 들어가지 않게 한다.
+.git
+.gradle
+.idea
+build
+uploads
+deploy
+scripts
+*.iml
+.env
+.env.*
+HELP.md

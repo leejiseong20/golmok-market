@@ -2,9 +2,10 @@ spring:
   application:
     name: golmok-market
 
+  # 기본값은 로컬 개발용이다. 운영(Docker)에서는 DB_URL·DB_USERNAME 을 환경변수로 덮어쓴다.
   datasource:
-    url: jdbc:mysql://localhost:3306/golmok?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
+    url: ${DB_URL:jdbc:mysql://localhost:3306/golmok?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
@@ -17,11 +18,6 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100   # N+1 완화 (IN 절로 묶어서 조회)
     open-in-view: false                 # 영속성 컨텍스트를 컨트롤러까지 끌고 가지 않는다
-
-logging:
-  level:
-    org.hibernate.SQL: debug
-    org.hibernate.orm.jdbc.bind: trace
 
 server:
   port: 8080
@@ -48,3 +44,17 @@ spring.servlet.multipart:
   max-file-size: 5MB
   # 10장 * 5MB + 여유. 요청 전체 한도를 두지 않으면 큰 요청 하나로 메모리를 밀어낼 수 있다.
   max-request-size: 55MB
+
+---
+# 로컬 개발 전용. ./gradlew bootRun 이 이 프로필을 켠다(build.gradle).
+# SQL 바인딩 값(trace)에는 이메일·비밀번호 해시·토큰 해시가 그대로 찍히므로 운영에서는 절대 켜지 않는다.
+# 기본값(프로필 없음)이 조용한 쪽이어야 설정을 빠뜨려도 운영 로그에 개인정보가 남지 않는다.
+spring:
+  config:
+    activate:
+      on-profile: local
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace

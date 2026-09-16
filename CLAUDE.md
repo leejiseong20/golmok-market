@@ -50,7 +50,9 @@
 - [완료] 이미지 업로드(로컬 디스크): 시그니처 검증, UUID 파일명, 날짜별 폴더, `/api/images/**` 서빙
 - [완료] 상품 등록·수정·soft delete·상태 변경·끌어올리기·내 판매내역 API. 이미지 경로/실제 파일 검증, 인증 동네 권한 검증, 상품 쓰기 잠금, 프론트 등록/수정/판매 관리 연결.
 - [검증] 2026-09-16 인수 기준 `30eb019`의 256개 → 281개(실패 0, 오류 0). `gradlew.bat build` 통과. 고정 Clock의 정확한 24시간 경계, 동시 끌어올리기 1건만 성공, 기존 카운터 보존, 판매완료 후 구매확정 회귀 검증 포함. 로컬 MySQL 8.0.44 validate 기동 및 실제 브라우저 데스크톱·모바일 상품 쓰기 시나리오 통과. 컬럼·SQL 스키마 변경 없음. 커밋·푸시 미실행.
-- [다음] **배포** → 채팅 → 거래·리뷰 → 결제·알림
+- [완료] 배포 준비: Dockerfile, GitHub Actions(테스트 → GHCR 이미지), `deploy/`(EC2 한 대 Docker Compose: MySQL · 앱 · Caddy HTTPS), 데모 시드 스크립트, 단계별 안내(`deploy/README.md`). 프론트 `vercel.json`
+- [검증] 2026-09-17 운영 Compose 구성을 로컬 Docker로 실제 기동: 스키마 자동 적용, HTTPS 경유 API, HTTP→HTTPS 리다이렉트, 앱·DB 포트 비노출, CORS 허용/차단, 데모 시드, 이미지 업로드·서빙, 앱 컨테이너 재생성 후 이미지 유지, 운영 로그에 SQL 값 없음. 메모리 앱 290MB(튜닝 전 461MB) · MySQL 160MB · Caddy 15MB, 요청 60회 실패 0
+- [다음] **실제 배포(AWS 가입·EC2·DuckDNS·Vercel은 사용자 작업)** → 채팅 → 거래·리뷰 → 결제·알림
 
 ## 알려진 과제
 
@@ -71,7 +73,9 @@
 - (해결) 마이페이지 판매내역 탭 미구현: 판매내역·상태 필터를 연결했다. 프로필 수정(`PATCH /api/users/me`)은 아직 미구현이다.
 - 거래는 조회와 구매확정만 있다. **거래를 만드는 API가 없어** 구매내역 데이터는 시드로만 생긴다. 거래 요청·결제·취소·환불은 2단계에서 채팅·결제와 함께 만든다.
 - `Review`, `ChatRoom`, `ChatMessage`는 아직 `IllegalArgumentException`/`IllegalStateException`을 던진다. 해당 도메인 구현 시 `BusinessException`으로 바꾼다. (`Product`, `Trade`는 완료)
-- 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
+- 운영은 **서버 한 대**(단일 장애점)이고 DB 백업이 수동이다. 이미지는 EC2 디스크 볼륨이라 인스턴스를 지우면 사라진다(S3 이전은 후속).
+- 운영 데모 계정 비밀번호가 공개돼 누구나 데모 상품을 고치거나 지울 수 있다. 망가지면 `clean_demo_data.sql` 후 `deploy/seed-demo.sh`로 다시 넣는다.
+- 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 운영은 `deploy/.env`로 주입하고 시간대는 Dockerfile 에서 `Asia/Seoul`로 고정한다.
   로컬은 `~/.gradle/gradle.properties`(저장소 밖)에 `jwtSecret`, 필요하면 `dbPassword`를 두면 `./gradlew bootRun` 만으로 뜬다.
   bootRun 이 띄우는 JVM 은 Gradle 데몬 환경을 물려받아 셸의 `export` 가 닿지 않기 때문에, build.gradle 에서 속성을 환경변수로 넘긴다.
   `JWT_SECRET` 이 실행할 때마다 바뀌면 이전 access token 이 전부 무효가 되므로 로컬에서도 고정값을 쓴다.
@@ -109,6 +113,13 @@
 - **이미지 형식은 파일 내용(시그니처)으로 판별한다.** 확장자와 Content-Type 은 클라이언트가 정하는 값이라 믿을 수 없다. 저장 파일명은 UUID 로 바꿔 경로 조작과 중복·한글 파일명 문제를 없앤다.
 - **업로드 파일은 `/api` 아래(`/api/images/**`)로 서빙한다.** 프론트 개발 서버는 `/api` 만 프록시하므로, 다른 경로를 쓰면 프록시와 배포용 리버스 프록시 규칙을 하나씩 더 만들어야 한다.
 - **이미지 업로드와 상품 등록을 분리했다.** 사진 선택 즉시 업로드해야 등록 버튼에서 기다리지 않는다.
+- **백엔드는 Vercel이 아니라 EC2에 올린다.** Vercel은 Java 서버를 상시 띄울 수 없고, 업로드 파일이 남지 않으며, 다음 단계인 채팅의 WebSocket을 유지할 수 없다. 프론트만 Vercel에 두고 `/api/*`를 백엔드로 전달한다.
+- **EC2 한 대에 MySQL·앱·Caddy를 Docker Compose로 올린다.** RDS를 쓰지 않아 비용이 가장 적다. 대가로 메모리 1GB를 나눠 써야 해 JVM(힙·코드캐시·다이렉트버퍼·톰캣 스레드)과 MySQL(버퍼풀·performance_schema)을 명시적으로 줄이고 스왑 2GB를 둔다. 실측으로 앱 461MB → 290MB.
+- **이미지는 GitHub Actions에서 빌드하고 서버는 내려받기만 한다.** 1GB 서버에서 Gradle 빌드는 메모리 부족으로 느리거나 실패한다. 테스트를 통과해야 이미지가 올라간다.
+- **백엔드에도 HTTPS(Caddy + DuckDNS)를 둔다.** Vercel→EC2 구간이 HTTP면 비밀번호·토큰이 평문으로 인터넷을 지난다. 채팅 WebSocket은 Vercel을 거치지 못해 브라우저가 백엔드에 직접 `wss://`로 붙어야 하므로 어차피 필요하다.
+- **SQL 로그는 `local` 프로필에서만 켠다.** 바인딩 값에 이메일·비밀번호 해시·토큰 해시가 찍힌다. 기본(프로필 없음)을 조용하게 둬야 운영에서 설정을 빠뜨려도 개인정보가 로그에 남지 않는다. `bootRun`이 `local`을 켠다.
+- **스키마 파일 맨 위에 `SET NAMES utf8mb4`를 둔다.** MySQL Docker 이미지의 초기화 스크립트는 파일을 latin1로 읽어 초기 데이터의 한글이 이중 인코딩돼 저장됐다(로컬 Docker 검증에서 발견). 로컬 DB는 다른 방식으로 적용해 드러나지 않았다.
+- **MySQL·앱 포트는 외부에 열지 않는다.** Compose에서 Caddy의 80/443만 공개하고, 보안 그룹도 22(내 IP)·80·443만 연다.
 - **refresh token은 JWT가 아닌 무작위 문자열이고, DB에는 SHA-256 해시만 저장한다.** 어차피 DB 조회로 검증하니 서명이 필요 없다. 원문을 저장하면 DB 유출 시 바로 로그인에 쓸 수 있다. BCrypt가 아닌 이유는 256비트 난수라 대입 공격이 불가능하고, 솔트가 있으면 해시로 조회(UNIQUE 인덱스)할 수 없어서다.
 - **재발급 조회는 `SELECT ... FOR UPDATE`다.** 같은 refresh token으로 동시 재발급이 오면 둘 다 성공해 한쪽 토큰이 조용히 무효가 된다. 잠금으로 두 번째 요청이 명확히 실패하게 한다.
 - **401을 `EXPIRED_TOKEN`과 `INVALID_TOKEN`으로 나눴다.** 프론트는 만료일 때만 재발급하고, 위조면 즉시 로그아웃한다.
