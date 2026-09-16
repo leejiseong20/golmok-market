@@ -27,4 +27,4 @@ jwt:
   refresh-token-validity: 14d
 
 cors:
-  allowed-origins: http://localhost:5173
+  allowed-origins: http://localhost:5173,http://127.0.0.1:5173

@@ -174,6 +174,26 @@ class AuthApiTest {
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5173"));
     }
 
+    /**
+     * 브라우저는 같은 출처라도 POST 에는 Origin 을 붙인다.
+     * 프론트를 127.0.0.1 로 열었을 때 localhost 만 허용돼 있으면 로그인만 403 이 된다(GET 목록은 통과).
+     */
+    @Test
+    void 개발_서버를_127_0_0_1_로_열어도_로그인_POST_가_허용된다() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://127.0.0.1:5173")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LOGIN_BODY))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://127.0.0.1:5173"))
+                .andExpect(status().isUnauthorized()); // 가입 전이므로 CORS 통과 후 LOGIN_FAILED
+
+        mockMvc.perform(options("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, "http://127.0.0.1:5173")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "content-type"))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void 허용하지_않은_출처의_preflight_는_거부한다() throws Exception {
         mockMvc.perform(options("/api/auth/login")

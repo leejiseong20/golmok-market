@@ -42,3 +42,25 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+/**
+ * 로컬 실행용 비밀값 전달.
+ *
+ * bootRun 이 띄우는 JVM 은 Gradle 데몬의 환경을 물려받는다.
+ * 그래서 셸에서 export 한 JWT_SECRET/DB_PASSWORD 가 앱까지 닿지 않고
+ * "Illegal base64 character" 같은 엉뚱한 기동 실패로 나타난다.
+ *
+ * 값은 저장소 밖(~/.gradle/gradle.properties)의 Gradle 속성에 두고 여기서 넘긴다.
+ *   jwtSecret=<openssl rand -base64 32 결과>
+ *   dbPassword=<로컬 MySQL 비밀번호>
+ * 속성이 없으면 환경변수를 쓰므로 배포 환경(환경변수 주입)은 그대로 동작한다.
+ * 비밀값 자체는 절대 이 파일이나 application.yml 에 적지 않는다.
+ */
+tasks.named('bootRun') {
+    [jwtSecret: 'JWT_SECRET', dbPassword: 'DB_PASSWORD'].each { propertyName, variableName ->
+        def value = findProperty(propertyName) ?: System.getenv(variableName)
+        if (value) {
+            environment variableName, value
+        }
+    }
+}

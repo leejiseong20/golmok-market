@@ -54,7 +54,10 @@
 - 동네 주소 부분 검색은 전체 주소를 연결한 LIKE 검색이므로 일반 인덱스로 검색 비용을 줄이기 어렵다. 근처 조회의 `(lat, lng)` 인덱스 역시 위도 범위 이후 경도까지 탐색에 효율적으로 쓰인다고 보장할 수 없다. 데이터 확대 시 MySQL EXPLAIN과 실측으로 확인한다.
 - 상품 검색은 현재 LIKE이므로 스키마의 FULLTEXT ngram 인덱스를 사용하지 않는다. 상품 정렬 인덱스는 `status`가 정렬 컬럼보다 앞에 있는데 목록은 모든 상태를 포함하므로 filesort 회피를 보장할 수 없다. 운영 MySQL EXPLAIN·실측 후 최적화한다.
 - 상품 목록·상세만 구현했다. 내 판매내역(`/api/products/me`), 상품 쓰기 API, 찜 추가·삭제, 검색 로그 적재는 미구현이다. 조회수가 DB `INT` 범위를 넘는 규모라면 컬럼 확장을 별도로 검토한다.
-- 실행 시 환경변수 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
+- 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 배포 시 `-Duser.timezone=Asia/Seoul` 권장.
+  로컬은 `~/.gradle/gradle.properties`(저장소 밖)에 `jwtSecret`, 필요하면 `dbPassword`를 두면 `./gradlew bootRun` 만으로 뜬다.
+  bootRun 이 띄우는 JVM 은 Gradle 데몬 환경을 물려받아 셸의 `export` 가 닿지 않기 때문에, build.gradle 에서 속성을 환경변수로 넘긴다.
+  `JWT_SECRET` 이 실행할 때마다 바뀌면 이전 access token 이 전부 무효가 되므로 로컬에서도 고정값을 쓴다.
 
 ## 설계 결정 기록
 
