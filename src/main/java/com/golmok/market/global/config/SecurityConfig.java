@@ -74,6 +74,10 @@ public class SecurityConfig {
                                 "/api/users/*",
                                 "/api/search/keywords/popular").permitAll()
 
+                        // 채팅 WebSocket 연결 요청. 브라우저가 헤더를 붙일 수 없어 여기서는 열고,
+                        // 인증은 첫 STOMP 프레임(CONNECT)에서 한다(StompAuthChannelInterceptor).
+                        .requestMatchers(HttpMethod.GET, WebSocketConfig.ENDPOINT).permitAll()
+
                         // 컨트롤러 밖 오류가 /error 로 포워드될 때 401 로 덮이지 않도록
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

@@ -4,6 +4,8 @@ import com.golmok.market.domain.chat.dto.ChatMessageResponse;
 import com.golmok.market.domain.chat.dto.ChatMessageSendRequest;
 import com.golmok.market.domain.chat.dto.ChatRoomResponse;
 import com.golmok.market.domain.chat.dto.ChatRoomSummaryResponse;
+import com.golmok.market.domain.chat.event.ChatMessageSentEvent;
+import com.golmok.market.domain.chat.event.ChatMessagesReadEvent;
 import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.product.ProductStatus;
@@ -16,6 +18,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -30,7 +33,8 @@ import java.util.stream.Collectors;
  * 1:1 채팅. 방 만들기 · 목록 · 메시지 조회/전송 · 읽음 · 나가기.
  *
  * 모든 방 기능은 "나가지 않은 참여자"만 쓸 수 있고, 아니면 404 로 답한다.
- * 실시간 전달(WebSocket)은 이 서비스 위에 얹는다. 저장·권한·읽음 규칙은 여기 한 곳에만 둔다.
+ * 저장·권한·읽음 규칙은 여기 한 곳에만 둔다. 실시간 전달은 변경 후 이벤트를 발행하고
+ * {@link ChatRealtimeRelay} 가 커밋 뒤에 WebSocket 으로 밀어준다(서비스는 WebSocket 을 모른다).
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +46,7 @@ public class ChatService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final ProductThumbnails productThumbnails;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 채팅하기 결과. 새 방이면 201, 기존 방이면 200 으로 답하기 위해 생성 여부를 함께 돌려준다. */
     public record OpenResult(ChatRoomResponse room, boolean created) {
@@ -147,14 +152,22 @@ public class ChatService {
         ChatMessage message = chatMessageRepository.save(
                 ChatMessage.text(room, userRepository.getReferenceById(viewer.id()), request.content()));
         room.recordMessage(message);
-        return ChatMessageResponse.from(message);
+        ChatMessageResponse response = ChatMessageResponse.from(message);
+        eventPublisher.publishEvent(new ChatMessageSentEvent(participantIds(room), response));
+        return response;
     }
 
-    /** 상대가 보낸 메시지를 모두 읽음 처리한다. 읽을 것이 없어도 성공이다(여러 번 호출해도 같다). */
+    /**
+     * 상대가 보낸 메시지를 모두 읽음 처리한다. 읽을 것이 없어도 성공이다(여러 번 호출해도 같다).
+     * 실제로 바뀐 메시지가 있을 때만 알린다. 화면이 방에 들어올 때마다 부르므로 빈 이벤트를 쏟아내지 않는다.
+     */
     @Transactional
     public void markAsRead(long roomId, AuthUser viewer) {
-        requireActiveRoom(roomId, viewer);
-        chatMessageRepository.markOpponentMessagesAsRead(roomId, viewer.id());
+        ChatRoom room = requireActiveRoom(roomId, viewer);
+        int updated = chatMessageRepository.markOpponentMessagesAsRead(roomId, viewer.id());
+        if (updated > 0) {
+            eventPublisher.publishEvent(new ChatMessagesReadEvent(participantIds(room), roomId, viewer.id()));
+        }
     }
 
     /**
@@ -170,10 +183,15 @@ public class ChatService {
         chatMessageRepository.markOpponentMessagesAsRead(roomId, viewer.id());
     }
 
-    private void requireActiveRoom(long roomId, AuthUser viewer) {
-        chatRoomRepository.findById(roomId)
+    private ChatRoom requireActiveRoom(long roomId, AuthUser viewer) {
+        return chatRoomRepository.findById(roomId)
                 .filter(found -> found.isActiveParticipant(viewer.id()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    /** 연관 엔티티 id 는 프록시를 초기화하지 않고 꺼낼 수 있어 추가 조회가 없다. */
+    private static List<Long> participantIds(ChatRoom room) {
+        return List.of(room.getBuyer().getId(), room.getSeller().getId());
     }
 
     private ChatRoomResponse toResponse(ChatRoom room, AuthUser viewer) {
