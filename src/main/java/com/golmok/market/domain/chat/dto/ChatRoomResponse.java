@@ -65,20 +65,21 @@ public record ChatRoomResponse(
      * @param cancel   판매자·구매자 · 이 방의 거래가 예약(REQUESTED)
      * @param complete 판매자 · 이 방의 거래가 예약(REQUESTED)
      */
-    public record TradeActions(boolean reserve, boolean cancel, boolean complete) {
+    public record TradeActions(boolean reserve, boolean cancel, boolean complete, boolean review) {
 
-        public static TradeActions of(ChatRoom room, Trade trade, Long viewerId) {
+        public static TradeActions of(ChatRoom room, Trade trade, Long viewerId, boolean canReview) {
             boolean seller = !room.isBuyer(viewerId);
             Product product = room.getProduct();
             boolean reserved = trade != null && trade.getStatus() == TradeStatus.REQUESTED;
             return new TradeActions(
                     seller && trade == null && !product.isDeleted() && product.getStatus() == ProductStatus.ON_SALE,
                     reserved,
-                    seller && reserved);
+                    seller && reserved,
+                    canReview);
         }
     }
 
-    public static ChatRoomResponse of(ChatRoom room, Long viewerId, String thumbnailUrl, Trade trade) {
+    public static ChatRoomResponse of(ChatRoom room, Long viewerId, String thumbnailUrl, Trade trade, boolean canReview) {
         return new ChatRoomResponse(
                 room.getId(),
                 ProductInfo.of(room.getProduct(), thumbnailUrl),
@@ -86,7 +87,7 @@ public record ChatRoomResponse(
                 room.isBuyer(viewerId) ? Role.BUYER : Role.SELLER,
                 room.hasOpponentLeft(viewerId),
                 TradeInfo.of(trade),
-                TradeActions.of(room, trade, viewerId),
+                TradeActions.of(room, trade, viewerId, canReview),
                 room.getCreatedAt());
     }
 }

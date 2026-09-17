@@ -19,6 +19,7 @@ public record PurchaseResponse(
         TradeStatus status,
         int amount,
         boolean canConfirm,
+        boolean canReview,
         ProductSummary product,
         SellerSummary seller,
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime createdAt,
@@ -32,13 +33,14 @@ public record PurchaseResponse(
     public record SellerSummary(Long id, String nickname) {
     }
 
-    public static PurchaseResponse from(Trade trade, String thumbnailUrl) {
+    public static PurchaseResponse from(Trade trade, String thumbnailUrl, boolean canReview) {
         var product = trade.getProduct();
         return new PurchaseResponse(
                 trade.getId(),
                 trade.getStatus(),
                 trade.getAmount(),
                 trade.getStatus().isBuyerConfirmable(),
+                canReview,
                 new ProductSummary(product.getId(), product.getTitle(), thumbnailUrl, product.getStatus(), product.isDeleted()),
                 new SellerSummary(trade.getSeller().getId(), trade.getSeller().getNickname()),
                 trade.getCreatedAt(),

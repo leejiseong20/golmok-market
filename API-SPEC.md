@@ -1,7 +1,7 @@
 # 골목마켓 API 명세
 
 1단계 범위: 인증 · 회원 · 상품 · 찜 · 카테고리 · 동네 · 검색 · 채팅(REST)
-10절: 채팅 실시간(WebSocket). 11절: 채팅방 직거래. 결제 · 리뷰는 이어서 추가한다.
+10절: 채팅 실시간(WebSocket). 11절: 채팅방 직거래. 12절: 리뷰·매너온도. 결제는 이어서 추가한다.
 
 ---
 
@@ -614,6 +614,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
       "status": "PAID",
       "amount": 145000,
       "canConfirm": true,
+      "canReview": false,
       "product": {
         "id": 44,
         "title": "에어팟 프로 2세대",
@@ -679,7 +680,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
   "myRole": "BUYER",
   "opponentLeft": false,
   "trade": null,
-  "tradeActions": { "reserve": false, "cancel": false, "complete": false },
+  "tradeActions": { "reserve": false, "cancel": false, "complete": false, "review": false },
   "createdAt": "2026-09-17T10:20:00"
 }
 ```
@@ -855,7 +856,7 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 ```json
 {
   "trade": { "id": 12, "status": "REQUESTED", "amount": 80000, "completedAt": null },
-  "tradeActions": { "reserve": false, "cancel": true, "complete": true }
+  "tradeActions": { "reserve": false, "cancel": true, "complete": true, "review": false }
 }
 ```
 
@@ -867,6 +868,7 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 | `reserve` | 판매자 · 이 방에 거래 없음 · 상품이 판매중(다른 방에 예약이 있으면 상품이 예약중이라 `false`) |
 | `cancel` | 판매자·구매자 · 이 방의 거래가 `REQUESTED` |
 | `complete` | 판매자 · 이 방의 거래가 `REQUESTED` |
+| `review` | 거래가 `CONFIRMED`이고 요청자가 아직 후기를 작성하지 않음 |
 
 ### POST `/api/chat-rooms/{id}/reservation` — 예약
 판매자만. 이 방의 구매자와 예약한다. 응답은 갱신된 채팅방 정보(`200`).
@@ -895,3 +897,62 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 - **진행 중 거래(`REQUESTED`·`PAID`·`SHIPPING`)가 있으면 상품 상태 변경(`PATCH /api/products/{id}/status`)과 삭제는 `409 TRADE_IN_PROGRESS`다.** 막지 않으면 거래는 예약인데 상품만 판매중이 되는 식으로 어긋난다.
 - 같은 상품을 두 채팅방에서 동시에 예약해도 한 건만 성공한다. 상품 → 채팅방 → 거래 순서로 잠근다.
 - 예약된 거래는 구매내역(8절)에 `REQUESTED`로 보이며 `canConfirm`은 `false`다.
+
+---
+
+## 12. 리뷰 · 매너온도
+
+### 작성 정책
+
+- 거래가 `CONFIRMED`인 판매자·구매자만 상대방에게 각각 한 번 작성한다. 상품의 `SOLD` 표시만으로는 작성할 수 없다.
+- 작성 기한 없음. 작성 즉시 공개하고 온도에 반영한다. 후기 수정·삭제 API는 제공하지 않는다.
+- 상품이 삭제되거나 채팅방을 나갔어도 거래 당사자의 작성 자격은 유지된다.
+- 점수 1·2·3·4·5점은 각각 매너온도 -0.4·-0.2·0·+0.2·+0.4℃. 범위는 0.0~99.9℃다.
+- 리뷰 저장과 온도 갱신은 한 트랜잭션이다. 중복·실패·롤백 시 온도가 추가 반영되지 않는다.
+- 후기로 시스템 메시지를 만들거나 나간 채팅방을 다시 열지 않는다. 후기의 실시간 이벤트도 없다.
+
+### POST `/api/trades/{tradeId}/reviews` — 후기 작성
+
+인증 필수. 평가받는 사람은 서버가 거래 상대방으로 결정하므로 요청에 상대 ID를 받지 않는다.
+
+```json
+{ "score": 5, "content": "친절하게 거래했어요." }
+```
+
+- `score`: 필수 정수, 1~5.
+- `content`: 선택, 최대 500자. 앞뒤 공백 제거, 공백뿐이면 null. 최대 길이는 원본 입력 기준.
+
+성공 `201`, 아래와 같은 공개 후기 한 건을 반환한다.
+
+```json
+{
+  "id": 21,
+  "reviewer": { "id": 10, "nickname": "골목이웃" },
+  "score": 5,
+  "content": "친절하게 거래했어요.",
+  "createdAt": "2026-09-17T12:00:00"
+}
+```
+
+| 상황 | 응답 |
+|---|---|
+| 미인증 | `401 UNAUTHORIZED` |
+| 없는 거래·거래 당사자가 아님 | `404 TRADE_NOT_FOUND` |
+| 완료 전·취소·환불 거래 | `409 REVIEW_NOT_ALLOWED` |
+| 이미 작성한 거래 | `409 ALREADY_REVIEWED` |
+| 잘못된 평점·500자 초과·잘못된 ID | `400 INVALID_INPUT` (본문 검증은 `errors[{field,reason}]`) |
+
+### GET `/api/users/{id}/reviews` — 받은 후기
+
+비로그인 공개. `cursor`, `size` 사용(기본 20, 최대 50, 범위 보정은 공통 규칙).
+`createdAt DESC, id DESC` 정렬, 커서는 `{createdAt}_{id}`. `size + 1`건을 조회한다.
+응답은 `CursorResponse`: `content`는 위 후기 응답의 배열, `nextCursor`, `hasNext`.
+없는 사용자는 `404 USER_NOT_FOUND`, 잘못된 커서는 `400 INVALID_INPUT`.
+공개 응답에 거래 ID·금액·채팅방·이메일은 포함하지 않는다.
+
+### 프로필 · 기존 응답 확장
+
+- 2절의 `GET /api/users/{id}` 공개 프로필을 구현했다. `productCount`는 삭제되지 않은 해당 사용자의 모든 상태 상품 수, `reviewCount`는 받은 후기 수다. 후기는 프로필에 넣지 않고 위 API로 페이지 조회한다.
+- 8절의 구매내역·구매확정 응답에 `canReview` 추가: `CONFIRMED`이고 본인이 아직 작성하지 않았으면 true.
+- 9·11절의 채팅방 응답에 `tradeActions.review` 추가. 작성 후 채팅방·구매내역·프로필을 재조회한다.
+- 프론트는 채팅방 거래 줄(양쪽)과 구매내역 카드(구매자)에서 작성한다. 상대 프로필과 마이페이지의 받은 후기에서 조회한다.

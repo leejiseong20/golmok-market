@@ -41,10 +41,17 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     @Query("select t.product.id from Trade t where t.id = :id and t.buyer.id = :buyerId")
     Optional<Long> findProductIdForBuyer(long id, long buyerId);
 
-    /** 상품 잠금을 먼저 잡은 뒤 거래를 잠근다. 다른 상품 쓰기와 잠금 순서를 통일한다. */
+    /**
+     * 상품 잠금을 먼저 잡은 뒤 거래를 잠근다. 다른 상품 쓰기와 잠금 순서를 통일한다.
+     * 상품은 호출한 쪽이 이미 잠가 영속성 컨텍스트에 있으므로 fetch join 하지 않는다(잠금 쿼리의 조인은 조인 행까지 잠근다).
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select t from Trade t join fetch t.product where t.id = :id")
-    Optional<Trade> findWithProduct(long id);
+    @Query("select t from Trade t where t.id = :id")
+    Optional<Trade> findByIdForUpdate(long id);
+
+    /** 잠금 전에 엔티티를 읽으면 기다린 뒤에도 낡은 상태가 남으므로 id 만 읽는다. */
+    @Query("select t.product.id from Trade t where t.id = :id and (t.buyer.id = :viewerId or t.seller.id = :viewerId)")
+    Optional<Long> findProductIdForParticipant(long id, long viewerId);
 
     /**
      * 채팅방에 보여줄 거래. 가장 최근 거래 중 취소·환불이 아닌 것(진행 중이거나 완료).

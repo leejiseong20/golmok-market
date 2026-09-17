@@ -63,6 +63,8 @@ public enum ErrorCode {
     REGION_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "동네는 최대 2개까지 인증할 수 있습니다."),
 
     // ---------- 거래 ----------
+    REVIEW_NOT_ALLOWED(HttpStatus.CONFLICT, "거래가 완료된 뒤에만 후기를 남길 수 있어요."),
+    ALREADY_REVIEWED(HttpStatus.CONFLICT, "이미 후기를 남긴 거래예요."),
     TRADE_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다."),
     CANNOT_BUY_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 구매할 수 없습니다."),
     // 거래와 상품 상태가 어긋나지 않도록, 진행 중 거래가 있으면 상품 쪽에서 직접 바꾸지 못하게 한다.

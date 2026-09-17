@@ -72,6 +72,7 @@ public class SecurityConfig {
                                 "/api/categories",
                                 "/api/regions", "/api/regions/nearby",
                                 "/api/users/*",
+                                "/api/users/*/reviews",
                                 "/api/search/keywords/popular").permitAll()
 
                         // 채팅 WebSocket 연결 요청. 브라우저가 헤더를 붙일 수 없어 여기서는 열고,

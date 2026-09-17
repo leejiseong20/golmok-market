@@ -1,7 +1,14 @@
 package com.golmok.market.domain.user;
 
 import com.golmok.market.global.entity.BaseTimeEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -35,7 +42,7 @@ public class User extends BaseTimeEntity {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
-    @Column(name = "manner_temp", nullable = false, precision = 3, scale = 1)
+    @Column(name = "manner_temp", nullable = false, precision = 3, scale = 1, updatable = false)
     private BigDecimal mannerTemp;
 
     @Enumerated(EnumType.STRING)
@@ -74,17 +81,6 @@ public class User extends BaseTimeEntity {
 
     public void recordLogin() {
         this.lastLoginAt = LocalDateTime.now();
-    }
-
-    /** 매너온도 조정. 0.0 ~ 99.9 범위를 벗어나지 않는다. */
-    public void adjustMannerTemp(BigDecimal delta) {
-        BigDecimal next = this.mannerTemp.add(delta);
-        if (next.compareTo(BigDecimal.ZERO) < 0) {
-            next = BigDecimal.ZERO;
-        } else if (next.compareTo(new BigDecimal("99.9")) > 0) {
-            next = new BigDecimal("99.9");
-        }
-        this.mannerTemp = next;
     }
 
     public void withdraw() {

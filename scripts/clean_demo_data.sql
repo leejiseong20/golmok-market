@@ -7,7 +7,7 @@
 -- 실행: mysql -u root -p golmok < scripts/clean_demo_data.sql
 --
 -- 지우는 순서는 외래키 방향의 역순이다.
--- (favorites·trades·chat_rooms·images → products → refresh_tokens·user_regions → users)
+-- (favorites·reviews·trades·chat_rooms·images → products → refresh_tokens·user_regions → users)
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -22,6 +22,14 @@ WHERE u.email LIKE '%@golmok.test';
 -- 데모 사용자가 남의 상품을 찜한 경우까지 정리한다.
 DELETE f FROM favorites f
 JOIN users u ON u.id = f.user_id
+WHERE u.email LIKE '%@golmok.test';
+
+-- 후기는 거래·회원을 참조하므로 거래보다 먼저 지운다. 후기를 쓰고 받는 사람은 항상 거래 당사자이므로
+-- 데모 회원이 낀 거래의 후기만 지우면 데모 회원이 남긴·받은 후기가 모두 빠진다.
+-- 주의: 이미 반영된 매너온도는 되돌리지 않는다. 데모 회원이 실계정에 후기를 남겼다면 그 실계정의 온도는 그대로다.
+DELETE r FROM reviews r
+JOIN trades t ON t.id = r.trade_id
+JOIN users u ON u.id = t.buyer_id OR u.id = t.seller_id
 WHERE u.email LIKE '%@golmok.test';
 
 -- 거래는 상품·회원을 참조하므로 먼저 지운다.
@@ -59,4 +67,5 @@ SELECT
   (SELECT COUNT(*) FROM users) AS users_left,
   (SELECT COUNT(*) FROM products) AS products_left,
   (SELECT COUNT(*) FROM favorites) AS favorites_left,
-  (SELECT COUNT(*) FROM chat_rooms) AS chat_rooms_left;
+  (SELECT COUNT(*) FROM chat_rooms) AS chat_rooms_left,
+  (SELECT COUNT(*) FROM reviews) AS reviews_left;

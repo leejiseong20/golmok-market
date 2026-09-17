@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, ProductRepositoryCustom {
+    long countBySellerIdAndDeletedAtIsNull(long sellerId);
 
     // 삭제된 상품도 거래 기록에서는 필요하므로 삭제 여부는 호출자가 판단한다.
     @Lock(LockModeType.PESSIMISTIC_WRITE)

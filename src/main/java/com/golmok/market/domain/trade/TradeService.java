@@ -17,12 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 구매내역 조회와 구매확정.
  *
- * 거래 생성(구매 요청)은 채팅·결제와 함께 2단계에서 만든다.
- * 지금은 이미 만들어진 거래를 보고, 받은 물건을 확정하는 것까지만 다룬다.
+ * 직거래 생성·완료는 ChatTradeService 가 담당하고, 여기서는 구매자의 기록과 구매확정을 다룬다.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +32,7 @@ public class TradeService {
     private final TradeRepository tradeRepository;
     private final ProductThumbnails productThumbnails;
     private final ProductRepository productRepository;
+    private final ReviewService reviewService;
 
     public CursorResponse<PurchaseResponse> findMyPurchases(AuthUser viewer, String rawCursor, Integer size) {
         Cursor cursor = Cursor.parse(rawCursor);
@@ -47,7 +48,10 @@ public class TradeService {
         Map<Long, String> thumbnails = productThumbnails.of(
                 page.content().stream().map(trade -> trade.getProduct().getId()).toList());
 
-        return page.map(trade -> PurchaseResponse.from(trade, thumbnails.get(trade.getProduct().getId())));
+        Set<Long> reviewed = reviewService.reviewedTradeIds(viewer.id(),
+                page.content().stream().map(Trade::getId).toList());
+        return page.map(trade -> PurchaseResponse.from(trade, thumbnails.get(trade.getProduct().getId()),
+                trade.getStatus() == TradeStatus.CONFIRMED && !reviewed.contains(trade.getId())));
     }
 
     /**
@@ -62,7 +66,7 @@ public class TradeService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRADE_NOT_FOUND));
         productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-        Trade trade = tradeRepository.findWithProduct(tradeId)
+        Trade trade = tradeRepository.findByIdForUpdate(tradeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRADE_NOT_FOUND));
         if (!trade.getBuyer().getId().equals(viewer.id())) {
             // 남의 거래인지 알려주지 않기 위해 403 대신 404 로 답한다.
@@ -70,6 +74,7 @@ public class TradeService {
         }
         trade.confirm();
         return PurchaseResponse.from(trade,
-                productThumbnails.of(List.of(trade.getProduct().getId())).get(trade.getProduct().getId()));
+                productThumbnails.of(List.of(trade.getProduct().getId())).get(trade.getProduct().getId()),
+                reviewService.canReview(trade, viewer.id()));
     }
 }

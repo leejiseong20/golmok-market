@@ -1,6 +1,9 @@
 package com.golmok.market.domain.user;
 
+import com.golmok.market.domain.product.ProductRepository;
+import com.golmok.market.domain.trade.ReviewRepository;
 import com.golmok.market.domain.user.dto.MyProfileResponse;
+import com.golmok.market.domain.user.dto.UserProfileResponse;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.security.AuthUser;
@@ -15,6 +18,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserRegionService userRegionService;
+    private final ProductRepository productRepository;
+    private final ReviewRepository reviewRepository;
+
+    public UserProfileResponse findProfile(long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return new UserProfileResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp(),
+                productRepository.countBySellerIdAndDeletedAtIsNull(id), reviewRepository.countByRevieweeId(id));
+    }
 
     /**
      * 토큰은 유효하지만 사용자가 없는 경우(탈퇴 후 물리 삭제 등)도 404 로 처리한다.

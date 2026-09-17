@@ -10,6 +10,7 @@ import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.product.ProductStatus;
 import com.golmok.market.domain.product.ProductThumbnails;
+import com.golmok.market.domain.trade.ReviewService;
 import com.golmok.market.domain.trade.Trade;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
@@ -51,6 +52,7 @@ public class ChatService {
     private final ProductThumbnails productThumbnails;
     private final ApplicationEventPublisher eventPublisher;
     private final TradeRepository tradeRepository;
+    private final ReviewService reviewService;
 
     /** 채팅하기 결과. 새 방이면 201, 기존 방이면 200 으로 답하기 위해 생성 여부를 함께 돌려준다. */
     public record OpenResult(ChatRoomResponse room, boolean created) {
@@ -215,6 +217,7 @@ public class ChatService {
         Long productId = room.getProduct().getId();
         Trade trade = tradeRepository.findFirstByChatRoomIdAndStatusNotInOrderByIdDesc(
                 room.getId(), List.of(TradeStatus.CANCELED, TradeStatus.REFUNDED)).orElse(null);
-        return ChatRoomResponse.of(room, viewer.id(), productThumbnails.of(List.of(productId)).get(productId), trade);
+        return ChatRoomResponse.of(room, viewer.id(), productThumbnails.of(List.of(productId)).get(productId), trade,
+                reviewService.canReview(trade, viewer.id()));
     }
 }

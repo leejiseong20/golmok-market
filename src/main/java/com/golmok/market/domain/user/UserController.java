@@ -7,6 +7,7 @@ import com.golmok.market.domain.trade.dto.PurchaseResponse;
 import com.golmok.market.domain.user.dto.MyProfileResponse;
 import com.golmok.market.domain.user.dto.MyRegionResponse;
 import com.golmok.market.domain.user.dto.RegionVerifyRequest;
+import com.golmok.market.domain.user.dto.UserProfileResponse;
 import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.security.AuthUser;
 import jakarta.validation.Valid;
@@ -34,6 +35,11 @@ public class UserController {
     private final FavoriteService favoriteService;
     private final TradeService tradeService;
     private final UserRegionService userRegionService;
+
+    @GetMapping("/{id}")
+    public UserProfileResponse findProfile(@PathVariable @Positive(message = "사용자 ID는 양수여야 합니다.") long id) {
+        return userService.findProfile(id);
+    }
 
     @GetMapping("/me")
     public MyProfileResponse findMe(@AuthenticationPrincipal AuthUser viewer) {
