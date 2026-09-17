@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,4 +39,16 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Notification n set n.read = true where n.user.id = :userId and n.read = false")
     int markAllAsRead(long userId);
+
+    /**
+     * 정리 배치용. 읽음 여부별로 기준 시각보다 오래된 알림 id 를 id 순으로 읽는다.
+     * 인덱스 (user_id, is_read, created_at) 는 사용자 조건이 없어 쓰이지 않는다. 오래된 행이 id 앞쪽에 몰려 있어
+     * 지금 규모에서는 괜찮지만, "더 없음"을 확인하는 마지막 조회는 테이블을 끝까지 볼 수 있다(알려진 과제).
+     */
+    @Query("select n.id from Notification n where n.read = :read and n.createdAt < :before order by n.id")
+    List<Long> findIdsCreatedBefore(boolean read, LocalDateTime before, Pageable pageable);
+
+    @Modifying
+    @Query("delete from Notification n where n.id in :ids")
+    int deleteByIdIn(Collection<Long> ids);
 }

@@ -33,6 +33,15 @@ app:
   image:
     upload-dir: build/test-uploads
     max-count: 10
+  scheduling:
+    # 테스트 도중 정리 배치가 돌면 결과가 흔들린다. 정리 작업은 테스트가 직접 실행한다.
+    enabled: false
+  cleanup:
+    cron: "0 0 4 * * *"
+    search-log-retention: 7d
+    read-notification-retention: 30d
+    unread-notification-retention: 90d
+    batch-size: 1000
 
 spring.servlet.multipart:
   max-file-size: 5MB

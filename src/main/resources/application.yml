@@ -39,6 +39,16 @@ app:
     # 로컬 디스크. 배포 시 볼륨을 붙이거나 S3 로 옮겨야 한다.
     upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
     max-count: 10
+  scheduling:
+    # 예약 작업(정리 배치)을 켤지. 끄면 정리 작업은 직접 실행할 때만 돈다.
+    enabled: ${SCHEDULING_ENABLED:true}
+  cleanup:
+    # 매일 새벽 4시(한국 시간). 초 분 시 일 월 요일
+    cron: "0 0 4 * * *"
+    search-log-retention: 7d
+    read-notification-retention: 30d
+    unread-notification-retention: 90d
+    batch-size: 1000
 
 spring.servlet.multipart:
   max-file-size: 5MB
