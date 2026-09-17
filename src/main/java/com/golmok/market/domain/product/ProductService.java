@@ -9,6 +9,8 @@ import com.golmok.market.domain.product.dto.ProductSummaryResponse;
 import com.golmok.market.domain.product.dto.ProductWriteRequest;
 import com.golmok.market.domain.product.event.ProductPriceDroppedEvent;
 import com.golmok.market.domain.region.Region;
+import com.golmok.market.domain.search.ProductSearchedEvent;
+import com.golmok.market.domain.search.SearchKeywords;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
 import com.golmok.market.domain.user.UserRegionRepository;
@@ -167,6 +169,12 @@ public class ProductService {
         Cursor cursor = Cursor.parse(rawCursor);
         order.validateCursor(cursor);
         PageSize pageSize = PageSize.of(size);
+        // 인기 검색어용 로그. "더 보기"(커서 요청)까지 세면 결과를 많이 넘겨본 검색어가 부풀려지므로 첫 페이지만 남긴다.
+        // 저장은 조회가 끝난 뒤 별도 실행기에서 한다(SearchLogRecorder). 검색 응답은 기다리지 않는다.
+        String loggedKeyword = SearchKeywords.normalize(normalizedKeyword);
+        if (cursor == null && loggedKeyword != null) {
+            eventPublisher.publishEvent(new ProductSearchedEvent(viewer == null ? null : viewer.id(), regionId, loggedKeyword));
+        }
         List<Product> fetched = productRepository.findPage(regionId, categoryId, normalizedKeyword, order, cursor, pageSize);
         CursorResponse<Product> page = CursorResponse.of(fetched, pageSize, order::cursorOf);
         List<Long> ids = page.content().stream().map(Product::getId).toList();
