@@ -7,7 +7,7 @@
 -- 실행: mysql -u root -p golmok < scripts/clean_demo_data.sql
 --
 -- 지우는 순서는 외래키 방향의 역순이다.
--- (favorites·reviews·trades·chat_rooms·images → products → refresh_tokens·user_regions → users)
+-- (favorites·reviews·trades·chat_rooms·images → products → notifications·refresh_tokens·user_regions → users)
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -53,6 +53,12 @@ DELETE p FROM products p
 JOIN users u ON u.id = p.seller_id
 WHERE u.email LIKE '%@golmok.test';
 
+-- 알림은 회원을 참조한다. 데모 회원이 받은 알림만 지운다.
+-- 실계정이 받은 알림(예: 데모 회원이 찜함)은 대상 경로만 남고 외래키가 없어 그대로 둔다.
+DELETE n FROM notifications n
+JOIN users u ON u.id = n.user_id
+WHERE u.email LIKE '%@golmok.test';
+
 DELETE rt FROM refresh_tokens rt
 JOIN users u ON u.id = rt.user_id
 WHERE u.email LIKE '%@golmok.test';
@@ -68,4 +74,5 @@ SELECT
   (SELECT COUNT(*) FROM products) AS products_left,
   (SELECT COUNT(*) FROM favorites) AS favorites_left,
   (SELECT COUNT(*) FROM chat_rooms) AS chat_rooms_left,
-  (SELECT COUNT(*) FROM reviews) AS reviews_left;
+  (SELECT COUNT(*) FROM reviews) AS reviews_left,
+  (SELECT COUNT(*) FROM notifications) AS notifications_left;

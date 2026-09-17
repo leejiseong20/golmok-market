@@ -72,6 +72,9 @@ public enum ErrorCode {
     NO_RESERVATION(HttpStatus.BAD_REQUEST, "이 채팅방에 진행 중인 예약이 없어요."),
     SELLER_ONLY(HttpStatus.FORBIDDEN, "판매자만 할 수 있어요."),
 
+    // ---------- 알림 ----------
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+
     // ---------- 채팅 ----------
     // 남의 방·이미 나간 방도 이 코드로 답한다. 403 을 주면 그 id 의 방이 존재한다는 사실이 드러난다.
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),

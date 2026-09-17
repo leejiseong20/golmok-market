@@ -32,6 +32,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     public static final String ENDPOINT = "/api/ws";
 
+    /**
+     * 서버가 사용자에게 보내는 목적지. 클라이언트는 /user 접두사를 붙여 구독한다(StompAuthChannelInterceptor.CHAT_SUBSCRIPTION).
+     * 채팅과 알림이 같은 큐를 쓰고 이벤트의 type 으로 구분한다.
+     */
+    public static final String USER_QUEUE = "/queue/chat";
+
     /** 하트비트 간격(ms). 조용한 연결을 프록시나 공유기가 끊지 않게 하고, 끊긴 연결을 서버가 알아채게 한다. */
     private static final long HEARTBEAT_MILLIS = 10_000;
 

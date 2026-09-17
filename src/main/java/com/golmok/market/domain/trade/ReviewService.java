@@ -1,5 +1,7 @@
 package com.golmok.market.domain.trade;
 
+import com.golmok.market.domain.notification.NotificationType;
+import com.golmok.market.domain.notification.event.NotificationRequestedEvent;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.trade.dto.ReviewCreateRequest;
 import com.golmok.market.domain.trade.dto.ReviewResponse;
@@ -12,6 +14,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -30,6 +33,7 @@ public class ReviewService {
     private final TradeRepository tradeRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 후기와 온도는 함께 커밋한다. 상품 삭제나 채팅방 나가기는 완료된 거래의 평가 자격을 없애지 않는다. */
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -57,6 +61,9 @@ public class ReviewService {
         Review review = reviewRepository.saveAndFlush(Review.write(trade, reviewer, request.score(), request.content()));
         ReviewResponse response = ReviewResponse.from(review);
         userRepository.adjustMannerTemp(review.getReviewee().getId(), review.toMannerDelta());
+        eventPublisher.publishEvent(new NotificationRequestedEvent(review.getReviewee().getId(), NotificationType.TRADE,
+                "새 후기를 받았어요", "%s님 · %d점".formatted(reviewer.getNickname(), review.getScore()),
+                NotificationRequestedEvent.MY_REVIEWS_URL));
         return response;
     }
 

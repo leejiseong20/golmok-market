@@ -14,6 +14,10 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     @Query("select f.product.id from Favorite f where f.user.id = :userId and f.product.id in :productIds")
     List<Long> findLikedProductIds(long userId, Collection<Long> productIds);
 
+    /** 가격 인하 알림을 받을 사람. */
+    @Query("select f.user.id from Favorite f where f.product.id = :productId")
+    List<Long> findUserIdsByProductId(long productId);
+
     boolean existsByUserIdAndProductId(long userId, long productId);
 
     Optional<Favorite> findByUserIdAndProductId(long userId, long productId);

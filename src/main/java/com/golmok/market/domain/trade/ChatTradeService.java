@@ -4,12 +4,15 @@ import com.golmok.market.domain.chat.ChatRoom;
 import com.golmok.market.domain.chat.ChatRoomRepository;
 import com.golmok.market.domain.chat.ChatService;
 import com.golmok.market.domain.chat.dto.ChatRoomResponse;
+import com.golmok.market.domain.notification.NotificationType;
+import com.golmok.market.domain.notification.event.NotificationRequestedEvent;
 import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +41,7 @@ public class ChatTradeService {
     private final ProductRepository productRepository;
     private final TradeRepository tradeRepository;
     private final ChatService chatService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ChatRoomResponse reserve(long roomId, AuthUser viewer) {
@@ -46,6 +50,7 @@ public class ChatTradeService {
         // 상품이 판매중이 아니면(다른 방에 예약됨·판매완료) Product.reserve() 가 INVALID_STATE 로 막는다.
         tradeRepository.save(Trade.request(locked.product(), locked.room(), locked.room().getBuyer()));
         chatService.postSystemMessage(locked.room(), viewer.id(), "판매자가 예약했어요.");
+        notifyOpponent(locked, viewer, "판매자가 예약했어요");
         return chatService.describe(locked.room(), viewer);
     }
 
@@ -56,6 +61,7 @@ public class ChatTradeService {
         boolean buyer = locked.room().isBuyer(viewer.id());
         trade.cancel(buyer ? "구매자가 예약 취소" : "판매자가 예약 취소");
         chatService.postSystemMessage(locked.room(), viewer.id(), (buyer ? "구매자" : "판매자") + "가 예약을 취소했어요.");
+        notifyOpponent(locked, viewer, (buyer ? "구매자" : "판매자") + "가 예약을 취소했어요");
         return chatService.describe(locked.room(), viewer);
     }
 
@@ -65,10 +71,21 @@ public class ChatTradeService {
         requireSeller(locked.room(), viewer);
         reservation(roomId).completeInPerson();
         chatService.postSystemMessage(locked.room(), viewer.id(), "거래가 완료됐어요.");
+        notifyOpponent(locked, viewer, "거래가 완료됐어요. 후기를 남겨 주세요");
         return chatService.describe(locked.room(), viewer);
     }
 
     private record Locked(Product product, ChatRoom room) {
+    }
+
+    /**
+     * 거래 상대에게 알림. 채팅방 시스템 메시지와 별개로, 방을 보고 있지 않은 상대가 알림함에서 알게 한다.
+     * 누르면 이 채팅방으로 간다.
+     */
+    private void notifyOpponent(Locked locked, AuthUser viewer, String title) {
+        eventPublisher.publishEvent(new NotificationRequestedEvent(locked.room().getOpponentId(viewer.id()),
+                NotificationType.TRADE, title, locked.product().getTitle(),
+                NotificationRequestedEvent.chatRoomUrl(locked.room().getId())));
     }
 
     /** 상품 → 방 순서로 잠근다. 나가지 않은 참여자가 아니면 방이 없는 것처럼 404. */

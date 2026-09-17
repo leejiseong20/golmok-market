@@ -3,6 +3,7 @@ package com.golmok.market.domain.chat;
 import com.golmok.market.domain.chat.dto.ChatRealtimeEvent;
 import com.golmok.market.domain.chat.event.ChatMessageSentEvent;
 import com.golmok.market.domain.chat.event.ChatMessagesReadEvent;
+import com.golmok.market.global.config.WebSocketConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.MessagingException;
@@ -26,9 +27,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatRealtimeRelay {
 
-    /** 서버 기준 목적지. 구독 주소 /user/queue/chat 과 짝이다. */
-    private static final String DESTINATION = "/queue/chat";
-
     private final SimpMessagingTemplate messagingTemplate;
 
     @TransactionalEventListener
@@ -45,7 +43,7 @@ public class ChatRealtimeRelay {
         for (Long userId : userIds) {
             try {
                 // 사용자 이름 규칙은 StompAuthChannelInterceptor.StompUser 와 같다(회원 id 문자열).
-                messagingTemplate.convertAndSendToUser(String.valueOf(userId), DESTINATION, payload);
+                messagingTemplate.convertAndSendToUser(String.valueOf(userId), WebSocketConfig.USER_QUEUE, payload);
             } catch (MessagingException e) {
                 log.warn("채팅 실시간 전달 실패 userId={}, roomId={}, type={}", userId, payload.roomId(), payload.type(), e);
             }

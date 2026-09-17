@@ -1,5 +1,7 @@
 package com.golmok.market.domain.product;
 
+import com.golmok.market.domain.notification.NotificationType;
+import com.golmok.market.domain.notification.event.NotificationRequestedEvent;
 import com.golmok.market.domain.product.dto.FavoriteResponse;
 import com.golmok.market.domain.product.dto.ProductSummaryResponse;
 import com.golmok.market.domain.user.UserRepository;
@@ -10,6 +12,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +38,7 @@ public class FavoriteService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final ProductThumbnails productThumbnails;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public FavoriteResponse favorite(long productId, AuthUser viewer) {
@@ -54,6 +58,9 @@ public class FavoriteService {
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.ALREADY_FAVORITED);
         }
+        // 누가 찜했는지는 알리지 않는다. 같은 상품의 안 읽은 찜 알림은 하나로 합쳐지므로 닉네임을 넣으면 틀린 정보가 된다.
+        eventPublisher.publishEvent(new NotificationRequestedEvent(product.getSeller().getId(), NotificationType.FAVORITE,
+                "누군가 내 상품을 찜했어요", product.getTitle(), NotificationRequestedEvent.productUrl(productId)));
         productRepository.incrementFavoriteCount(productId);
         return new FavoriteResponse(true, productRepository.findFavoriteCount(productId));
     }

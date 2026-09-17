@@ -7,6 +7,7 @@ import com.golmok.market.domain.product.dto.ProductBumpResponse;
 import com.golmok.market.domain.product.dto.ProductDetailResponse;
 import com.golmok.market.domain.product.dto.ProductSummaryResponse;
 import com.golmok.market.domain.product.dto.ProductWriteRequest;
+import com.golmok.market.domain.product.event.ProductPriceDroppedEvent;
 import com.golmok.market.domain.region.Region;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
@@ -19,6 +20,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ public class ProductService {
     private final UserRegionRepository userRegionRepository;
     private final ImageUrlValidator imageUrlValidator;
     private final TradeRepository tradeRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -70,10 +73,15 @@ public class ProductService {
         Region region = verifiedRegion(viewer.id(), request.regionId());
         Category category = category(request.categoryId());
         imageUrlValidator.validate(request.imageUrls());
+        int oldPrice = product.getPrice();
         product.update(request.title(), request.description(), request.price(), category, region,
                 request.isNegotiable(), request.tradeType());
         product.replaceImages(request.imageUrls());
         productRepository.flush();
+        if (request.price() < oldPrice) {
+            // 찜한 사람에게만 알린다. 받는 사람 조회는 커밋 뒤 알림 쪽에서 한다.
+            eventPublisher.publishEvent(new ProductPriceDroppedEvent(product.getId(), product.getTitle(), oldPrice, request.price()));
+        }
         return ownDetail(product);
     }
 

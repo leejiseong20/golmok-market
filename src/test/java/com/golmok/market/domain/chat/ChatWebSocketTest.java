@@ -3,6 +3,7 @@ package com.golmok.market.domain.chat;
 import com.golmok.market.domain.category.Category;
 import com.golmok.market.domain.category.CategoryRepository;
 import com.golmok.market.domain.chat.dto.ChatMessageSendRequest;
+import com.golmok.market.domain.product.FavoriteService;
 import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.region.Region;
@@ -64,6 +65,7 @@ class ChatWebSocketTest {
 
     @LocalServerPort int port;
     @Autowired ChatService chatService;
+    @Autowired FavoriteService favoriteService;
     @Autowired UserRepository userRepository;
     @Autowired ProductRepository productRepository;
     @Autowired CategoryRepository categoryRepository;
@@ -79,6 +81,7 @@ class ChatWebSocketTest {
     private User buyer;
     private User outsider;
     private long roomId;
+    private long productId;
 
     @BeforeEach
     void 준비() {
@@ -91,6 +94,7 @@ class ChatWebSocketTest {
         Region region = regionRepository.save(Region.create("서울특별시", "강남구", "역삼동" + suffix, 37.5, 127));
         Product product = productRepository.save(Product.builder().seller(seller).category(category).region(region)
                 .title("원목 식탁").description("실시간 채팅을 확인할 상품입니다.").price(80000).build());
+        productId = product.getId();
         roomId = chatService.open(product.getId(), auth(buyer)).room().roomId();
     }
 
@@ -343,6 +347,24 @@ class ChatWebSocketTest {
 
         // 이미 모두 읽었으므로 다시 불러도 이벤트가 없다.
         chatService.markAsRead(roomId, auth(seller));
+        assertThat(buyerInbox.poll(300, TimeUnit.MILLISECONDS)).isNull();
+    }
+
+    @Test
+    void 알림이_저장되면_받는_사람의_같은_연결로_NOTIFICATION_이벤트가_간다() throws Exception {
+        BlockingQueue<String> sellerInbox = subscribe(connectAs(seller), seller);
+        BlockingQueue<String> buyerInbox = subscribe(connectAs(buyer), buyer);
+
+        favoriteService.favorite(productId, auth(buyer));
+
+        String event = sellerInbox.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        assertThat(event).isNotNull();
+        assertThat((String) JsonPath.read(event, "$.type")).isEqualTo("NOTIFICATION");
+        assertThat((String) JsonPath.read(event, "$.notification.type")).isEqualTo("FAVORITE");
+        assertThat((String) JsonPath.read(event, "$.notification.targetUrl")).isEqualTo("/products/" + productId);
+        assertThat((Boolean) JsonPath.read(event, "$.notification.read")).isFalse();
+        assertThat(((Number) JsonPath.read(event, "$.notification.id")).longValue()).isPositive();
+        // 찜한 사람에게는 알림이 없다.
         assertThat(buyerInbox.poll(300, TimeUnit.MILLISECONDS)).isNull();
     }
 }
