@@ -4,6 +4,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
@@ -75,4 +76,13 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             order by r.lastMessageAt desc, r.id desc
             """)
     List<ChatRoom> findMyRoomsAfter(long userId, LocalDateTime cursorTime, long cursorId, Pageable pageable);
+
+    /** 회원 탈퇴: 그 회원이 낀 모든 방에서 "나감"으로 표시한다. 대화 내용은 남는다(상대에게는 상대가 나간 방으로 보인다). */
+    @Modifying(flushAutomatically = true)
+    @Query("update ChatRoom r set r.buyerLeft = true where r.buyer.id = :userId")
+    int leaveAllAsBuyer(long userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("update ChatRoom r set r.sellerLeft = true where r.seller.id = :userId")
+    int leaveAllAsSeller(long userId);
 }

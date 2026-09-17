@@ -43,11 +43,15 @@ public record ChatRoomResponse(
         }
     }
 
-    /** 채팅방·채팅 목록에서 상대를 알아보게 사진 경로를 함께 준다. 조회가 이미 상대 회원을 fetch join 해 추가 쿼리는 없다. */
-    public record Opponent(Long id, String nickname, String profileImageUrl, BigDecimal mannerTemp) {
+    /**
+     * 채팅방·채팅 목록에서 상대를 알아보게 사진 경로를 함께 준다. 조회가 이미 상대 회원을 fetch join 해 추가 쿼리는 없다.
+     * withdrawn 이면 화면은 입력창·거래 버튼을 막고 프로필로 연결하지 않는다(탈퇴 회원 프로필은 404).
+     */
+    public record Opponent(Long id, String nickname, String profileImageUrl, BigDecimal mannerTemp, boolean withdrawn) {
 
         public static Opponent of(User user) {
-            return new Opponent(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp());
+            return new Opponent(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp(),
+                    user.isWithdrawn());
         }
     }
 
@@ -62,7 +66,7 @@ public record ChatRoomResponse(
     }
 
     /**
-     * @param reserve  판매자 · 이 방에 거래 없음 · 상품이 판매중(다른 방에 예약이 있으면 상품이 예약중이라 false)
+     * @param reserve  판매자 · 이 방에 거래 없음 · 상품이 판매중(다른 방에 예약이 있으면 상품이 예약중이라 false) · 구매자가 탈퇴하지 않음
      * @param cancel   판매자·구매자 · 이 방의 거래가 예약(REQUESTED)
      * @param complete 판매자 · 이 방의 거래가 예약(REQUESTED)
      */
@@ -73,7 +77,8 @@ public record ChatRoomResponse(
             Product product = room.getProduct();
             boolean reserved = trade != null && trade.getStatus() == TradeStatus.REQUESTED;
             return new TradeActions(
-                    seller && trade == null && !product.isDeleted() && product.getStatus() == ProductStatus.ON_SALE,
+                    seller && trade == null && !product.isDeleted() && product.getStatus() == ProductStatus.ON_SALE
+                            && !room.getBuyer().isWithdrawn(),
                     reserved,
                     seller && reserved,
                     canReview);

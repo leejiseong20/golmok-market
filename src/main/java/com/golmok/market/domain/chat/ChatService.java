@@ -14,6 +14,7 @@ import com.golmok.market.domain.trade.ReviewService;
 import com.golmok.market.domain.trade.Trade;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
+import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
@@ -155,6 +156,10 @@ public class ChatService {
         ChatRoom room = chatRoomRepository.findByIdForUpdate(roomId)
                 .filter(found -> found.isActiveParticipant(viewer.id()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        // 탈퇴한 상대에게 보내면 그 회원이 나간 방을 되살리기만 하고 아무도 읽지 않는다.
+        if (room.getOpponent(viewer.id()).isWithdrawn()) {
+            throw new BusinessException(ErrorCode.CHAT_OPPONENT_WITHDRAWN);
+        }
         return post(room, ChatMessage.text(room, userRepository.getReferenceById(viewer.id()), request.content()));
     }
 
@@ -199,6 +204,11 @@ public class ChatService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         room.leave(viewer.id());
         chatMessageRepository.markOpponentMessagesAsRead(roomId, viewer.id());
+    }
+
+    /** 헤더·하단 탭의 채팅 뱃지. 내가 나가지 않은 방에서 상대가 보낸 안 읽은 메시지 합계. */
+    public UnreadCountResponse countUnread(AuthUser viewer) {
+        return new UnreadCountResponse(chatMessageRepository.countAllUnread(viewer.id()));
     }
 
     private ChatRoom requireActiveRoom(long roomId, AuthUser viewer) {

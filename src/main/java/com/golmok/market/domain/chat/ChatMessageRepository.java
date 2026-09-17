@@ -33,6 +33,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     List<RoomUnreadCount> countUnread(long userId, Collection<Long> roomIds);
 
+    /**
+     * 안 읽은 메시지 합계(뱃지). 방별 수(countUnread)와 같은 조건에 "내가 나가지 않은 방"을 더한다.
+     * 나갈 때 읽음 처리하므로 나간 방에는 보통 안 읽은 메시지가 없지만, 목록에 없는 방의 수가 뱃지에 섞이지 않게 명시한다.
+     */
+    @Query("""
+            select count(m) from ChatMessage m join m.room r
+            where m.sender.id <> :userId and m.read = false
+              and ((r.buyer.id = :userId and r.buyerLeft = false)
+                or (r.seller.id = :userId and r.sellerLeft = false))
+            """)
+    long countAllUnread(long userId);
+
     /** 상대가 보낸 안 읽은 메시지를 한 번에 읽음 처리한다. 메시지를 하나씩 읽어 들이지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

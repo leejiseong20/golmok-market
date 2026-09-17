@@ -3,6 +3,7 @@ package com.golmok.market.domain.user;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
@@ -29,4 +30,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select rt from RefreshToken rt where rt.token = :tokenHash")
     Optional<RefreshToken> findByTokenForUpdate(String tokenHash);
+
+    /** 회원 탈퇴: 모든 기기의 로그인 연장을 막는다. 이미 발급된 access token 은 만료(최대 30분)까지 유효하다. */
+    @Modifying(flushAutomatically = true)
+    @Query("delete from RefreshToken rt where rt.user.id = :userId")
+    int deleteAllByUserId(long userId);
 }

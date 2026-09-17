@@ -61,6 +61,10 @@ public class NotificationService {
     }
 
     private void save(NotificationRequestedEvent request) {
+        // 탈퇴한 회원에게는 쌓지 않는다(탈퇴 때 알림함을 비웠고 다시 볼 사람이 없다). 없는 회원도 같이 거른다.
+        if (userRepository.findById(request.recipientId()).filter(user -> !user.isWithdrawn()).isEmpty()) {
+            return;
+        }
         if (request.type().collapsesUnread() && notificationRepository.existsByUserIdAndTypeAndTargetUrlAndReadFalse(
                 request.recipientId(), request.type(), request.targetUrl())) {
             return;

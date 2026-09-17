@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, ProductRepositoryCustom {
@@ -69,4 +71,28 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
     /** 증감 직후의 값만 필요할 때. 상품 전체를 다시 읽지 않는다. */
     @Query("select p.favoriteCount from Product p where p.id = :id")
     int findFavoriteCount(long id);
+
+    // ---------- 회원 탈퇴 ----------
+
+    /**
+     * 탈퇴하는 회원의 판매 상품을 잠근다. 같은 상품의 예약·구매확정·후기 작성과 줄을 세워
+     * "진행 중 거래 없음"을 확인한 뒤 상품을 지우기 전까지 새 예약이 끼어들지 못하게 한다. 잠금 쿼리라 fetch join 하지 않는다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Product p where p.seller.id = :sellerId and p.deletedAt is null order by p.id")
+    List<Product> findAllOnSaleBySellerForUpdate(long sellerId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("update Product p set p.deletedAt = :now where p.seller.id = :sellerId and p.deletedAt is null")
+    int softDeleteAllBySeller(long sellerId, LocalDateTime now);
+
+    /** 탈퇴 회원이 찜한 상품들의 찜 수를 하나씩 줄인다(찜 행을 지우기 전에 호출). 0 미만으로는 내려가지 않는다. */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Product p
+            set p.favoriteCount = case when p.favoriteCount > 0 then p.favoriteCount - 1 else 0 end,
+                p.updatedAt = p.updatedAt
+            where p.id in (select f.product.id from Favorite f where f.user.id = :userId)
+            """)
+    int decrementFavoriteCountsLikedBy(long userId);
 }

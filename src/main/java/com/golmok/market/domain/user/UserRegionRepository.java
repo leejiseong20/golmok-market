@@ -1,6 +1,7 @@
 package com.golmok.market.domain.user;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -28,4 +29,8 @@ public interface UserRegionRepository extends JpaRepository<UserRegion, Long> {
     Optional<UserRegion> findByUserIdAndRegionId(long userId, long regionId);
 
     long countByUserId(long userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from UserRegion ur where ur.user.id = :userId")
+    int deleteAllByUserId(long userId);
 }

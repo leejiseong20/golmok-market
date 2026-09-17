@@ -4,6 +4,7 @@ import com.golmok.market.domain.chat.dto.ChatMessageResponse;
 import com.golmok.market.domain.chat.dto.ChatMessageSendRequest;
 import com.golmok.market.domain.chat.dto.ChatRoomResponse;
 import com.golmok.market.domain.chat.dto.ChatRoomSummaryResponse;
+import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.security.AuthUser;
 import jakarta.validation.Valid;
@@ -42,6 +43,12 @@ public class ChatController {
                                                                @RequestParam(required = false) String cursor,
                                                                @RequestParam(required = false) Integer size) {
         return chatService.findMyRooms(viewer, cursor, size);
+    }
+
+    /** 헤더·하단 탭 채팅 뱃지. 경로 변수 방보다 먼저 선언했지만, 순서와 관계없이 고정 경로가 우선한다. */
+    @GetMapping("/api/chat-rooms/unread-count")
+    public UnreadCountResponse countUnread(@AuthenticationPrincipal AuthUser viewer) {
+        return chatService.countUnread(viewer);
     }
 
     @GetMapping("/api/chat-rooms/{id}")

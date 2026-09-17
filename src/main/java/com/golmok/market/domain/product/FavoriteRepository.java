@@ -2,6 +2,7 @@ package com.golmok.market.domain.product;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
@@ -53,4 +54,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
             order by f.createdAt desc, f.id desc
             """)
     List<Favorite> findNextPage(long userId, LocalDateTime cursorTime, long cursorId, Pageable pageable);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Favorite f where f.user.id = :userId")
+    int deleteAllByUserId(long userId);
 }

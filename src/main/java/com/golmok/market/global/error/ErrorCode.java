@@ -50,6 +50,7 @@ public enum ErrorCode {
 
     // ---------- 회원 · 찜 ----------
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "비밀번호가 올바르지 않습니다."),
     CANNOT_FAVORITE_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 찜할 수 없습니다."),
     ALREADY_FAVORITED(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
 
@@ -78,6 +79,7 @@ public enum ErrorCode {
     // ---------- 채팅 ----------
     // 남의 방·이미 나간 방도 이 코드로 답한다. 403 을 주면 그 id 의 방이 존재한다는 사실이 드러난다.
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
+    CHAT_OPPONENT_WITHDRAWN(HttpStatus.BAD_REQUEST, "탈퇴한 사용자와는 대화하거나 거래할 수 없어요."),
     CANNOT_CHAT_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품에는 채팅을 걸 수 없습니다."),
     PRODUCT_NOT_CHATTABLE(HttpStatus.BAD_REQUEST, "거래가 완료된 상품에는 새 채팅을 시작할 수 없습니다.");
 

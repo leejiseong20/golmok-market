@@ -147,12 +147,13 @@ class AuthServiceTest {
     }
 
     @Test
-    void 탈퇴한_계정은_비밀번호가_맞아도_USER_NOT_ACTIVE() {
+    void 탈퇴하면_원래_이메일로는_로그인할_수_없다() {
+        // 탈퇴 때 이메일을 익명화하므로 원래 이메일로는 계정을 찾을 수 없다. 가입 여부를 드러내지 않게 일반 로그인 실패와 같다.
         SignupResponse signup = signup("user@example.com", "골목이");
-        userRepository.findById(signup.id()).orElseThrow().withdraw();
+        userRepository.findById(signup.id()).orElseThrow().withdraw(LocalDateTime.now());
         em.flush();
 
-        assertErrorCode(() -> login("user@example.com"), ErrorCode.USER_NOT_ACTIVE);
+        assertErrorCode(() -> login("user@example.com"), ErrorCode.LOGIN_FAILED);
     }
 
     @Test
@@ -201,7 +202,7 @@ class AuthServiceTest {
     void 탈퇴한_계정의_refresh_token_은_거부하고_삭제한다() {
         SignupResponse signup = signup("user@example.com", "골목이");
         String raw = login("user@example.com").refreshToken();
-        userRepository.findById(signup.id()).orElseThrow().withdraw();
+        userRepository.findById(signup.id()).orElseThrow().withdraw(LocalDateTime.now());
         em.flush();
 
         assertErrorCode(() -> authService.reissue(raw), ErrorCode.USER_NOT_ACTIVE);

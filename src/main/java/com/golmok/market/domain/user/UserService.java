@@ -28,8 +28,10 @@ public class UserService {
     private final ReviewRepository reviewRepository;
     private final ImageUrlValidator imageUrlValidator;
 
+    /** 탈퇴한 회원의 공개 프로필은 없는 사용자로 본다(익명화된 행만 남아 있다). */
     public UserProfileResponse findProfile(long id) {
         User user = userRepository.findById(id)
+                .filter(found -> !found.isWithdrawn())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return new UserProfileResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp(),
                 productRepository.countBySellerIdAndDeletedAtIsNull(id), reviewRepository.countByRevieweeId(id));
@@ -38,9 +40,11 @@ public class UserService {
     /**
      * 토큰은 유효하지만 사용자가 없는 경우(탈퇴 후 물리 삭제 등)도 404 로 처리한다.
      * access token 은 서명만 검증하고 DB 를 보지 않으므로 이 상황이 생길 수 있다.
+     * 탈퇴 직후 남은 access token(최대 30분)으로 요청해도 같은 404 다.
      */
     public MyProfileResponse findMe(AuthUser viewer) {
         return userRepository.findById(viewer.id())
+                .filter(user -> !user.isWithdrawn())
                 .map(user -> MyProfileResponse.from(user, userRegionService.findMyRegions(user.getId())))
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
@@ -57,6 +61,8 @@ public class UserService {
     @Transactional
     public MyProfileResponse updateProfile(AuthUser viewer, ProfileUpdateRequest request) {
         User user = userRepository.findById(viewer.id())
+                // 탈퇴 후 남은 토큰으로 익명화된 닉네임·사진을 되돌리지 못하게 한다.
+                .filter(found -> !found.isWithdrawn())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (request.profileImageUrl() != null) {
             imageUrlValidator.validate(List.of(request.profileImageUrl()));

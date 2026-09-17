@@ -9,11 +9,13 @@ import com.golmok.market.domain.user.dto.MyRegionResponse;
 import com.golmok.market.domain.user.dto.ProfileUpdateRequest;
 import com.golmok.market.domain.user.dto.RegionVerifyRequest;
 import com.golmok.market.domain.user.dto.UserProfileResponse;
+import com.golmok.market.domain.user.dto.WithdrawRequest;
 import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.security.AuthUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +38,7 @@ public class UserController {
     private final FavoriteService favoriteService;
     private final TradeService tradeService;
     private final UserRegionService userRegionService;
+    private final WithdrawalService withdrawalService;
 
     @GetMapping("/{id}")
     public UserProfileResponse findProfile(@PathVariable @Positive(message = "사용자 ID는 양수여야 합니다.") long id) {
@@ -52,6 +55,13 @@ public class UserController {
     public MyProfileResponse updateProfile(@AuthenticationPrincipal AuthUser viewer,
                                            @Valid @RequestBody ProfileUpdateRequest request) {
         return userService.updateProfile(viewer, request);
+    }
+
+    /** 회원 탈퇴. 성공하면 204. 화면은 곧바로 세션을 지운다(이미 발급된 access token 은 만료까지 유효). */
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> withdraw(@AuthenticationPrincipal AuthUser viewer, @Valid @RequestBody WithdrawRequest request) {
+        withdrawalService.withdraw(viewer, request.password());
+        return ResponseEntity.noContent().build();
     }
 
     /** 찜 목록은 상품 목록과 같은 응답 형식이라 프론트가 같은 카드 컴포넌트를 재사용한다. */

@@ -145,6 +145,17 @@ class NotificationFlowTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void 탈퇴한_회원에게는_알림을_저장하지_않는다() throws Exception {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                userRepository.findById(other.getId()).orElseThrow().withdraw(java.time.LocalDateTime.now()));
+
+        notificationService.create(new NotificationRequestedEvent(other.getId(), NotificationType.TRADE,
+                "판매자가 예약을 취소했어요", "원목 식탁", "/chat-rooms/1"));
+
+        notifications(otherToken).andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
     // ---------- 찜 ----------
 
     @Test

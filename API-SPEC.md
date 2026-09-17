@@ -244,6 +244,34 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 
 이미 만들어진 알림 문구(`닉네임님 · 5점`)에는 이전 닉네임이 남는다. 후기 목록·채팅·상품 상세는 조회 시점의 닉네임을 쓴다.
 
+### DELETE `/api/users/me` — 회원 탈퇴
+```json
+{ "password": "Golmok123!" }
+```
+`204 No Content`. 되돌릴 수 없다. 모든 처리가 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않는다.
+
+| 대상 | 처리 |
+|---|---|
+| 회원 | 익명화해서 남긴다: 상태 `WITHDRAWN`, 이메일 `withdrawn-{id}@deleted.invalid`, 닉네임 `탈퇴한사용자{id}`, 사진·전화번호 삭제. 원래 이메일·닉네임으로 다시 가입할 수 있다 |
+| 판매 상품 | 모두 soft delete |
+| 내가 한 찜 | 삭제하고 해당 상품의 찜 수를 줄인다 |
+| 채팅방 | 모든 방에서 나감으로 표시. 메시지는 남아 상대가 계속 본다 |
+| 알림 · 인증 동네 · refresh token | 삭제(다른 기기도 재발급에서 로그아웃된다) |
+| 거래 · 후기 | 그대로 둔다(상대의 기록이다). 후기 작성자는 익명화된 닉네임으로 보인다 |
+
+| 상황 | 응답 |
+|---|---|
+| 비밀번호 불일치 | `400 PASSWORD_MISMATCH` |
+| 비밀번호 누락·공백 | `400 INVALID_INPUT` |
+| 진행 중인 거래(예약·결제·배송)가 있음(구매자·판매자 모두) | `409 TRADE_IN_PROGRESS` |
+| 이미 탈퇴함(남은 access token 으로 요청) | `404 USER_NOT_FOUND` |
+| 비로그인 | `401 UNAUTHORIZED` |
+
+- 탈퇴 뒤 원래 이메일로 로그인하면 `401 LOGIN_FAILED`다.
+- 이미 발급된 access token 은 만료(최대 30분)까지 서명 검증을 통과한다(로그아웃과 같은 정책). 그동안 `GET/PATCH /api/users/me`는 `404 USER_NOT_FOUND`다. 열려 있던 WebSocket 연결도 끊지 않는다.
+- 탈퇴한 회원의 공개 프로필(`GET /api/users/{id}`)·받은 후기(`GET /api/users/{id}/reviews`)는 `404 USER_NOT_FOUND`다.
+- 탈퇴한 회원에게는 알림을 저장하지 않는다. 복구 기능은 없다.
+
 ### GET `/api/users/{id}` — 다른 사용자 프로필
 ```json
 {
@@ -700,7 +728,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
     "thumbnailUrl": "/api/images/2026/09/16/....jpg",
     "status": "ON_SALE", "deleted": false
   },
-  "opponent": { "id": 10, "nickname": "판매자", "profileImageUrl": null, "mannerTemp": 36.5 },
+  "opponent": { "id": 10, "nickname": "판매자", "profileImageUrl": null, "mannerTemp": 36.5, "withdrawn": false },
   "myRole": "BUYER",
   "opponentLeft": false,
   "trade": null,
@@ -731,7 +759,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
     {
       "roomId": 7,
       "product": { "id": 44, "title": "원목 식탁", "price": 80000, "thumbnailUrl": "...", "status": "ON_SALE", "deleted": false },
-      "opponent": { "id": 12, "nickname": "구매자", "profileImageUrl": "/api/images/2026/09/17/....jpg", "mannerTemp": 36.5 },
+      "opponent": { "id": 12, "nickname": "구매자", "profileImageUrl": "/api/images/2026/09/17/....jpg", "mannerTemp": 36.5, "withdrawn": false },
       "lastMessage": "네고 가능할까요?",
       "lastMessageAt": "2026-09-17T10:21:30",
       "unreadCount": 2
@@ -750,6 +778,14 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 ### GET `/api/chat-rooms/{id}` — 채팅방 정보
 응답은 채팅하기와 같다. 목록에서 방에 들어가거나 새로고침할 때 쓴다.
 `opponentLeft`가 `true`면 상대가 나간 방이다(메시지를 보내면 상대 목록에 다시 나타난다).
+`opponent.withdrawn`이 `true`면 상대가 탈퇴했다. 대화 기록은 볼 수 있지만 메시지 전송·예약은 `400 CHAT_OPPONENT_WITHDRAWN`이고, 상대 프로필은 404다.
+
+### GET `/api/chat-rooms/unread-count` — 안 읽은 메시지 합계
+```json
+{ "count": 3 }
+```
+헤더·하단 탭의 채팅 뱃지용. **내가 나가지 않은 방**에서 **상대가 보낸** 안 읽은 메시지 수의 합이다(목록의 `unreadCount`와 같은 기준).
+실시간으로 수를 보내지 않는다. 프론트는 로그인·소켓 재연결·새 메시지·내 읽음 이벤트·화면 이동 때 다시 부른다.
 
 ### GET `/api/chat-rooms/{id}/messages` — 메시지 목록
 커서 페이징. **최신 메시지부터** 내려준다. 화면은 뒤집어서 아래부터 쌓고, 위로 스크롤할 때 `nextCursor`로 이전 메시지를 불러온다.
@@ -784,6 +820,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 - `content`는 공백만으로 채울 수 없고 1000자 이하다. 어기면 `400 INVALID_INPUT`(`errors[].field = "content"`).
 - 상대가 나간 방이면 상대 목록에 방이 다시 나타난다.
 - 판매완료·삭제된 상품의 방에서도 대화는 계속할 수 있다.
+- 상대가 탈퇴했으면 `400 CHAT_OPPONENT_WITHDRAWN`.
 
 ### PATCH `/api/chat-rooms/{id}/read` — 읽음 처리
 본문 없음. `204 No Content`. 이 방에서 **상대가 보낸** 안 읽은 메시지를 모두 읽음으로 바꾼다.
@@ -910,6 +947,7 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 | 상황 | 응답 |
 |---|---|
 | 구매자가 예약·거래완료 | `403 SELLER_ONLY` |
+| 탈퇴한 구매자에게 예약(`tradeActions.reserve`도 `false`) | `400 CHAT_OPPONENT_WITHDRAWN` |
 | 상품이 판매중이 아님(다른 방에 예약됨·판매완료) | `400 INVALID_STATE` |
 | 예약 없이 취소·거래완료, 완료된 거래를 취소 | `400 NO_RESERVATION` |
 | 참여자가 아님·나간 방·없는 방 | `404 CHAT_ROOM_NOT_FOUND` |

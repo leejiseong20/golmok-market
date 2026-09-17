@@ -78,7 +78,8 @@ public class ReviewService {
     }
 
     public CursorResponse<ReviewResponse> findReceived(long userId, String rawCursor, Integer size) {
-        if (!userRepository.existsById(userId)) {
+        // 탈퇴한 회원이 받은 후기는 공개 프로필과 같이 없는 사용자로 본다.
+        if (userRepository.findById(userId).filter(user -> !user.isWithdrawn()).isEmpty()) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
         Cursor cursor = Cursor.parse(rawCursor);

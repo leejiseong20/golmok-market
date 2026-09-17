@@ -326,6 +326,45 @@ class ChatApiTest {
     }
 
     @Test
+    void 안_읽은_메시지_합계는_모든_방에서_상대가_보낸_안_읽은_메시지를_센다() throws Exception {
+        long tableRoom = openRoom(product.getId(), buyerToken);
+        long chairRoom = openRoom(saveProduct("의자").getId(), buyerToken);
+        send(tableRoom, buyerToken, "안녕하세요");
+        send(tableRoom, buyerToken, "네고 가능할까요?");
+        send(chairRoom, buyerToken, "의자도 있나요?");
+        send(chairRoom, sellerToken, "네 있어요");
+
+        mockMvc.perform(auth(get("/api/chat-rooms/unread-count"), sellerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(3));
+        // 내가 보낸 메시지는 세지 않는다.
+        mockMvc.perform(auth(get("/api/chat-rooms/unread-count"), buyerToken))
+                .andExpect(jsonPath("$.count").value(1));
+
+        mockMvc.perform(auth(patch("/api/chat-rooms/{id}/read", tableRoom), sellerToken)).andExpect(status().isNoContent());
+        mockMvc.perform(auth(get("/api/chat-rooms/unread-count"), sellerToken))
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void 안_읽은_메시지_합계에서_내가_나간_방은_빠진다() throws Exception {
+        long roomId = openRoom(product.getId(), buyerToken);
+        send(roomId, buyerToken, "안녕하세요");
+        // 나가기 API 는 읽음 처리까지 하므로, 읽지 않은 채 나간 상태(탈퇴 일괄 나가기 등)를 직접 만든다.
+        em.createQuery("update ChatRoom r set r.sellerLeft = true where r.id = :id")
+                .setParameter("id", roomId).executeUpdate();
+        em.clear();
+
+        mockMvc.perform(auth(get("/api/chat-rooms/unread-count"), sellerToken))
+                .andExpect(jsonPath("$.count").value(0));
+    }
+
+    @Test
+    void 안_읽은_메시지_합계는_로그인해야_볼_수_있다() throws Exception {
+        mockMvc.perform(get("/api/chat-rooms/unread-count")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void 목록의_마지막_메시지는_200자로_자른다() throws Exception {
         long roomId = openRoom(product.getId(), buyerToken);
         send(roomId, buyerToken, "가".repeat(250));

@@ -23,6 +23,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
 
+    public static final String WITHDRAWN_NICKNAME_PREFIX = "탈퇴한사용자";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -83,9 +85,23 @@ public class User extends BaseTimeEntity {
         this.lastLoginAt = LocalDateTime.now();
     }
 
-    public void withdraw() {
+    /**
+     * 탈퇴. 행은 남기고(거래·후기·채팅 기록이 참조한다) 개인정보를 지운다.
+     *
+     * 이메일·닉네임은 UNIQUE 라 그대로 두면 같은 이메일로 영영 다시 가입할 수 없다. 사람이 쓸 수 없는 값으로 바꿔
+     * 원래 값을 풀어 주고, 남은 기록(후기 작성자 등)에 개인정보가 보이지 않게 한다. .invalid 는 실제로 존재할 수 없는 도메인이다.
+     */
+    public void withdraw(LocalDateTime now) {
         this.status = UserStatus.WITHDRAWN;
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = now;
+        this.email = "withdrawn-" + this.id + "@deleted.invalid";
+        this.nickname = WITHDRAWN_NICKNAME_PREFIX + this.id;
+        this.profileImageUrl = null;
+        this.phone = null;
+    }
+
+    public boolean isWithdrawn() {
+        return this.status == UserStatus.WITHDRAWN;
     }
 
     public boolean isActive() {

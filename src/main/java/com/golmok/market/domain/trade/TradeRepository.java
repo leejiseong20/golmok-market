@@ -66,4 +66,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
 
     /** 상품에 진행 중인 거래가 있는지. 상품 상태 수동 변경·삭제를 막는 데 쓴다. */
     boolean existsByProductIdAndStatusIn(long productId, Collection<TradeStatus> statuses);
+
+    /** 회원이 구매자나 판매자로 참여한 진행 중 거래가 있는지. 회원 탈퇴를 막는 데 쓴다. */
+    @Query("select count(t) > 0 from Trade t where (t.buyer.id = :userId or t.seller.id = :userId) and t.status in :statuses")
+    boolean existsByParticipantAndStatusIn(long userId, Collection<TradeStatus> statuses);
 }

@@ -47,6 +47,9 @@ public class ChatTradeService {
     public ChatRoomResponse reserve(long roomId, AuthUser viewer) {
         Locked locked = lock(roomId, viewer);
         requireSeller(locked.room(), viewer);
+        if (locked.room().getBuyer().isWithdrawn()) {
+            throw new BusinessException(ErrorCode.CHAT_OPPONENT_WITHDRAWN);
+        }
         // 상품이 판매중이 아니면(다른 방에 예약됨·판매완료) Product.reserve() 가 INVALID_STATE 로 막는다.
         tradeRepository.save(Trade.request(locked.product(), locked.room(), locked.room().getBuyer()));
         chatService.postSystemMessage(locked.room(), viewer.id(), "판매자가 예약했어요.");
