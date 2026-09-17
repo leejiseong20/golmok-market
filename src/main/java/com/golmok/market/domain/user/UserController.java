@@ -6,6 +6,7 @@ import com.golmok.market.domain.trade.TradeService;
 import com.golmok.market.domain.trade.dto.PurchaseResponse;
 import com.golmok.market.domain.user.dto.MyProfileResponse;
 import com.golmok.market.domain.user.dto.MyRegionResponse;
+import com.golmok.market.domain.user.dto.ProfileUpdateRequest;
 import com.golmok.market.domain.user.dto.RegionVerifyRequest;
 import com.golmok.market.domain.user.dto.UserProfileResponse;
 import com.golmok.market.global.pagination.CursorResponse;
@@ -44,6 +45,13 @@ public class UserController {
     @GetMapping("/me")
     public MyProfileResponse findMe(@AuthenticationPrincipal AuthUser viewer) {
         return userService.findMe(viewer);
+    }
+
+    /** 프로필 수정. 닉네임과 사진을 항상 함께 받는다(ProfileUpdateRequest 참고). */
+    @PatchMapping("/me")
+    public MyProfileResponse updateProfile(@AuthenticationPrincipal AuthUser viewer,
+                                           @Valid @RequestBody ProfileUpdateRequest request) {
+        return userService.updateProfile(viewer, request);
     }
 
     /** 찜 목록은 상품 목록과 같은 응답 형식이라 프론트가 같은 카드 컴포넌트를 재사용한다. */

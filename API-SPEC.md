@@ -225,9 +225,24 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
 `email`은 화면에서 쓰지 않아 내려주지 않는다. `regions`의 `id`는 **동네(region) id**다(아래 삭제·대표 지정 경로에 그대로 쓴다).
 
 ### PATCH `/api/users/me` — 프로필 수정
+인증 필요. **닉네임과 사진을 항상 함께 보낸다.** 보낸 필드만 바꾸는 방식이면 "사진 삭제"로 보낸 `null` 과 "사진은 그대로"를 구분할 수 없기 때문이다.
 ```json
-{ "nickname": "새닉네임", "profileImageUrl": "https://..." }
+{ "nickname": "새닉네임", "profileImageUrl": "/api/images/2026/09/17/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg" }
 ```
+응답은 갱신된 내 정보(`GET /api/users/me` 와 같은 형식)라 화면이 다시 조회하지 않아도 된다.
+
+- `nickname`: 필수. 앞뒤 공백을 뺀 뒤 2~30자(가입과 같은 규칙). 지금 닉네임을 그대로 보내도 성공이다.
+- `profileImageUrl`: `POST /api/images` 가 발급한 경로만 받는다(상품 사진과 같은 검증). `null` 이면 사진을 지운다. 이전 사진 파일은 바로 지우지 않는다.
+- 닉네임 변경 횟수 제한은 없다.
+
+| 상황 | 응답 |
+|---|---|
+| 다른 사람이 쓰는 닉네임 | `409 DUPLICATE_NICKNAME` (동시에 같은 닉네임으로 바꿔도 하나만 성공한다) |
+| 닉네임 누락·길이 오류 | `400 INVALID_INPUT` (`errors[].field = "nickname"`) |
+| 서버에 업로드한 경로가 아닌 사진·없는 파일 | `400 INVALID_IMAGE_URL` |
+| 비로그인 | `401 UNAUTHORIZED` |
+
+이미 만들어진 알림 문구(`닉네임님 · 5점`)에는 이전 닉네임이 남는다. 후기 목록·채팅·상품 상세는 조회 시점의 닉네임을 쓴다.
 
 ### GET `/api/users/{id}` — 다른 사용자 프로필
 ```json
@@ -676,7 +691,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
     "thumbnailUrl": "/api/images/2026/09/16/....jpg",
     "status": "ON_SALE", "deleted": false
   },
-  "opponent": { "id": 10, "nickname": "판매자", "mannerTemp": 36.5 },
+  "opponent": { "id": 10, "nickname": "판매자", "profileImageUrl": null, "mannerTemp": 36.5 },
   "myRole": "BUYER",
   "opponentLeft": false,
   "trade": null,
@@ -707,7 +722,7 @@ id를 함께 넣는 이유: 같은 초에 끌어올린 상품이나 같은 가�
     {
       "roomId": 7,
       "product": { "id": 44, "title": "원목 식탁", "price": 80000, "thumbnailUrl": "...", "status": "ON_SALE", "deleted": false },
-      "opponent": { "id": 12, "nickname": "구매자", "mannerTemp": 36.5 },
+      "opponent": { "id": 12, "nickname": "구매자", "profileImageUrl": "/api/images/2026/09/17/....jpg", "mannerTemp": 36.5 },
       "lastMessage": "네고 가능할까요?",
       "lastMessageAt": "2026-09-17T10:21:30",
       "unreadCount": 2
@@ -927,7 +942,7 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 ```json
 {
   "id": 21,
-  "reviewer": { "id": 10, "nickname": "골목이웃" },
+  "reviewer": { "id": 10, "nickname": "골목이웃", "profileImageUrl": null },
   "score": 5,
   "content": "친절하게 거래했어요.",
   "createdAt": "2026-09-17T12:00:00"

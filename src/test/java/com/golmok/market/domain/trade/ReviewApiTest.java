@@ -69,6 +69,9 @@ class ReviewApiTest {
 
     @Test
     void 양쪽이_각각_작성하고_온도와_공개_프로필에_반영된다() throws Exception {
+        // 받은 후기 목록에 작성자 사진 경로가 나오는지도 본다.
+        users.findById(buyer.getId()).orElseThrow().updateProfile("구매자", "/api/images/2026/09/17/buyer.jpg");
+        em.flush();
         write(buyer, "{\"score\":5,\"content\":\"  친절해요  \"}")
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.content").value("친절해요"))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty()).andExpect(jsonPath("$.tradeId").doesNotExist());
@@ -81,6 +84,7 @@ class ReviewApiTest {
         mvc.perform(get("/api/users/{id}/reviews", seller.getId())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].score").value(5))
                 .andExpect(jsonPath("$.content[0].reviewer.nickname").value("구매자"))
+                .andExpect(jsonPath("$.content[0].reviewer.profileImageUrl").value("/api/images/2026/09/17/buyer.jpg"))
                 .andExpect(jsonPath("$.content[0].tradeId").doesNotExist());
         assertThat(users.findById(buyer.getId()).orElseThrow().getMannerTemp()).isEqualByComparingTo("36.1");
     }

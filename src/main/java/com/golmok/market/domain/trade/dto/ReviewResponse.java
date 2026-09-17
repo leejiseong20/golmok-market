@@ -9,12 +9,14 @@ import java.time.LocalDateTime;
 public record ReviewResponse(Long id, Reviewer reviewer, int score, String content,
                              @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") LocalDateTime createdAt) {
 
-    public record Reviewer(Long id, String nickname) {
+    /** 작성자 사진 경로. 받은 후기 조회가 작성자를 fetch join 해 추가 쿼리는 없다. */
+    public record Reviewer(Long id, String nickname, String profileImageUrl) {
     }
 
     public static ReviewResponse from(Review review) {
         return new ReviewResponse(review.getId(),
-                new Reviewer(review.getReviewer().getId(), review.getReviewer().getNickname()),
+                new Reviewer(review.getReviewer().getId(), review.getReviewer().getNickname(),
+                        review.getReviewer().getProfileImageUrl()),
                 review.getScore(), review.getContent(), review.getCreatedAt());
     }
 }

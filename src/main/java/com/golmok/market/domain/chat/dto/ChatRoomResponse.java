@@ -43,10 +43,11 @@ public record ChatRoomResponse(
         }
     }
 
-    public record Opponent(Long id, String nickname, BigDecimal mannerTemp) {
+    /** 채팅방·채팅 목록에서 상대를 알아보게 사진 경로를 함께 준다. 조회가 이미 상대 회원을 fetch join 해 추가 쿼리는 없다. */
+    public record Opponent(Long id, String nickname, String profileImageUrl, BigDecimal mannerTemp) {
 
         public static Opponent of(User user) {
-            return new Opponent(user.getId(), user.getNickname(), user.getMannerTemp());
+            return new Opponent(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp());
         }
     }
 

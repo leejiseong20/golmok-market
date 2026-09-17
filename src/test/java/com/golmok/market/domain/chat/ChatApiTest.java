@@ -126,6 +126,7 @@ class ChatApiTest {
                 .andExpect(jsonPath("$.product.deleted").value(false))
                 .andExpect(jsonPath("$.opponent.id").value(seller.getId()))
                 .andExpect(jsonPath("$.opponent.nickname").value("판매자"))
+                .andExpect(jsonPath("$.opponent.profileImageUrl", nullValue()))
                 .andExpect(jsonPath("$.opponent.mannerTemp").value(36.5))
                 .andExpect(jsonPath("$.myRole").value("BUYER"))
                 .andExpect(jsonPath("$.opponentLeft").value(false));
@@ -277,6 +278,19 @@ class ChatApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.opponent.nickname").value("구매자"))
                 .andExpect(jsonPath("$.myRole").value("SELLER"));
+    }
+
+    @Test
+    void 상대가_프로필_사진을_등록했으면_채팅방과_목록에_사진_경로가_나온다() throws Exception {
+        userRepository.findById(buyer.getId()).orElseThrow().updateProfile("구매자", "/api/images/2026/09/17/buyer.jpg");
+        em.flush();
+        long roomId = openRoom(product.getId(), buyerToken);
+        send(roomId, buyerToken, "안녕하세요");
+
+        mockMvc.perform(auth(get("/api/chat-rooms/{id}", roomId), sellerToken))
+                .andExpect(jsonPath("$.opponent.profileImageUrl").value("/api/images/2026/09/17/buyer.jpg"));
+        mockMvc.perform(auth(get("/api/chat-rooms"), sellerToken))
+                .andExpect(jsonPath("$.content[0].opponent.profileImageUrl").value("/api/images/2026/09/17/buyer.jpg"));
     }
 
     // ---------- 목록 · 읽음 ----------
