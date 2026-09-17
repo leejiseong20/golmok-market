@@ -65,6 +65,10 @@ public enum ErrorCode {
     // ---------- 거래 ----------
     TRADE_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다."),
     CANNOT_BUY_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 구매할 수 없습니다."),
+    // 거래와 상품 상태가 어긋나지 않도록, 진행 중 거래가 있으면 상품 쪽에서 직접 바꾸지 못하게 한다.
+    TRADE_IN_PROGRESS(HttpStatus.CONFLICT, "진행 중인 거래가 있어요. 채팅방에서 예약을 취소하거나 거래를 완료해 주세요."),
+    NO_RESERVATION(HttpStatus.BAD_REQUEST, "이 채팅방에 진행 중인 예약이 없어요."),
+    SELLER_ONLY(HttpStatus.FORBIDDEN, "판매자만 할 수 있어요."),
 
     // ---------- 채팅 ----------
     // 남의 방·이미 나간 방도 이 코드로 답한다. 403 을 주면 그 id 의 방이 존재한다는 사실이 드러난다.

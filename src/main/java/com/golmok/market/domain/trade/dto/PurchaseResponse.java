@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 구매내역 한 건.
  *
  * canConfirm 을 서버가 계산해 내려준다. "지금 구매확정을 누를 수 있는가"는
- * TradeStatus 의 전이 규칙이 정하는 것이라, 프론트가 상태 목록을 따로 들고 있으면
+ * TradeStatus.isBuyerConfirmable() 이 정하는 것이라, 프론트가 상태 목록을 따로 들고 있으면
  * 규칙이 두 곳으로 갈라진다.
  */
 public record PurchaseResponse(
@@ -38,7 +38,7 @@ public record PurchaseResponse(
                 trade.getId(),
                 trade.getStatus(),
                 trade.getAmount(),
-                trade.getStatus().canTransitionTo(TradeStatus.CONFIRMED),
+                trade.getStatus().isBuyerConfirmable(),
                 new ProductSummary(product.getId(), product.getTitle(), thumbnailUrl, product.getStatus(), product.isDeleted()),
                 new SellerSummary(trade.getSeller().getId(), trade.getSeller().getNickname()),
                 trade.getCreatedAt(),

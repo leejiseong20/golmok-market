@@ -8,6 +8,8 @@ import com.golmok.market.domain.product.dto.ProductDetailResponse;
 import com.golmok.market.domain.product.dto.ProductSummaryResponse;
 import com.golmok.market.domain.product.dto.ProductWriteRequest;
 import com.golmok.market.domain.region.Region;
+import com.golmok.market.domain.trade.TradeRepository;
+import com.golmok.market.domain.trade.TradeStatus;
 import com.golmok.market.domain.user.UserRegionRepository;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.global.error.BusinessException;
@@ -40,6 +42,7 @@ public class ProductService {
     private final UserRepository userRepository;
     private final UserRegionRepository userRegionRepository;
     private final ImageUrlValidator imageUrlValidator;
+    private final TradeRepository tradeRepository;
     private final Clock clock;
 
     @Transactional
@@ -76,12 +79,15 @@ public class ProductService {
 
     @Transactional
     public void delete(long id, AuthUser viewer) {
-        ownedForUpdate(id, viewer).softDelete();
+        Product product = ownedForUpdate(id, viewer);
+        requireNoTradeInProgress(product);
+        product.softDelete();
     }
 
     @Transactional
     public ProductDetailResponse changeStatus(long id, ProductStatus status, AuthUser viewer) {
         Product product = ownedForUpdate(id, viewer);
+        requireNoTradeInProgress(product);
         switch (status) {
             case ON_SALE -> product.cancelReservation();
             case RESERVED -> product.reserve();
@@ -115,6 +121,17 @@ public class ProductService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         return product;
+    }
+
+    /**
+     * 진행 중 거래(예약·결제·발송)가 있으면 상품 상태를 직접 바꾸거나 지우지 못한다.
+     * 막지 않으면 거래는 예약인데 상품만 판매중이 되는 식으로 둘이 어긋난다. 거래 상태는 채팅방에서 바꾼다.
+     * 상품 잠금을 잡은 뒤 확인하므로, 같은 상품을 잠그는 예약과 동시에 들어와도 순서가 보장된다.
+     */
+    private void requireNoTradeInProgress(Product product) {
+        if (tradeRepository.existsByProductIdAndStatusIn(product.getId(), TradeStatus.activeStatuses())) {
+            throw new BusinessException(ErrorCode.TRADE_IN_PROGRESS);
+        }
     }
 
     private Region verifiedRegion(long userId, long regionId) {

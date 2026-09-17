@@ -96,7 +96,14 @@ class ChatWebSocketTest {
 
     @AfterEach
     void 연결_정리() {
-        sessions.stream().filter(StompSession::isConnected).forEach(StompSession::disconnect);
+        for (StompSession session : sessions) {
+            try {
+                session.disconnect();
+            } catch (RuntimeException ignored) {
+                // 서버가 ERROR 프레임으로 이미 끊은 세션은 isConnected() 가 잠깐 true 로 남아 있어도 전송이 실패한다.
+                // 정리 단계의 실패로 테스트 결과를 바꾸지 않는다.
+            }
+        }
     }
 
     private User saveUser(String prefix, String suffix) {

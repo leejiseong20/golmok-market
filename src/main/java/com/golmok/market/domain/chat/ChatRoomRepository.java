@@ -37,6 +37,10 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             """)
     Optional<ChatRoom> findWithDetails(long id);
 
+    /** 잠금 전에 어떤 상품을 잠글지만 알아낸다. 엔티티로 읽으면 뒤이은 잠금 조회가 이미 읽은 낡은 상태를 돌려준다. */
+    @Query("select r.product.id from ChatRoom r where r.id = :id")
+    Optional<Long> findProductIdById(long id);
+
     /**
      * 내 채팅 목록 첫 페이지. 최근 메시지 순.
      *

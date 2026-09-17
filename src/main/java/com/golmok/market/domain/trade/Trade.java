@@ -103,13 +103,30 @@ public class Trade extends BaseTimeEntity {
         transitionTo(TradeStatus.SHIPPING);
     }
 
+    /** 구매자의 구매확정(결제 거래). 직거래 완료는 {@link #completeInPerson()}. */
     public void confirm() {
+        if (!this.status.isBuyerConfirmable()) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "결제가 끝난 거래만 구매확정할 수 있습니다.");
+        }
         transitionTo(TradeStatus.CONFIRMED);
         this.completedAt = LocalDateTime.now();
         // 판매자가 먼저 판매완료로 표시했어도 구매자의 수령 확인은 별개다.
         if (this.product.getStatus() != ProductStatus.SOLD) {
             this.product.markSold();
         }
+    }
+
+    /**
+     * 직거래 완료. 판매자가 채팅방에서 누른다(권한 검사는 서비스).
+     * 결제가 없어 서버가 대금을 맡아두지 않으므로, 판매자가 완료를 표시해도 구매자가 손해 볼 것이 없다.
+     */
+    public void completeInPerson() {
+        if (this.status != TradeStatus.REQUESTED) {
+            throw new BusinessException(ErrorCode.INVALID_STATE, "예약중인 거래만 거래완료할 수 있습니다.");
+        }
+        transitionTo(TradeStatus.CONFIRMED);
+        this.completedAt = LocalDateTime.now();
+        this.product.markSold();
     }
 
     public void cancel(String reason) {

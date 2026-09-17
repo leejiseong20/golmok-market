@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,4 +45,18 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from Trade t join fetch t.product where t.id = :id")
     Optional<Trade> findWithProduct(long id);
+
+    /**
+     * 채팅방에 보여줄 거래. 가장 최근 거래 중 취소·환불이 아닌 것(진행 중이거나 완료).
+     * 취소된 거래는 보여주지 않는다. 취소 뒤에는 다시 예약할 수 있는 상태로 돌아가야 하기 때문이다.
+     */
+    Optional<Trade> findFirstByChatRoomIdAndStatusNotInOrderByIdDesc(long chatRoomId, Collection<TradeStatus> excluded);
+
+    /** 채팅방의 예약(REQUESTED) 거래를 잠가 읽는다. 상품·방 잠금을 먼저 잡은 뒤 호출한다. 잠금 쿼리에는 fetch join 을 넣지 않는다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from Trade t where t.chatRoom.id = :chatRoomId and t.status = :status")
+    Optional<Trade> findByChatRoomIdAndStatusForUpdate(long chatRoomId, TradeStatus status);
+
+    /** 상품에 진행 중인 거래가 있는지. 상품 상태 수동 변경·삭제를 막는 데 쓴다. */
+    boolean existsByProductIdAndStatusIn(long productId, Collection<TradeStatus> statuses);
 }

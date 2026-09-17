@@ -10,6 +10,9 @@ import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.product.ProductStatus;
 import com.golmok.market.domain.product.ProductThumbnails;
+import com.golmok.market.domain.trade.Trade;
+import com.golmok.market.domain.trade.TradeRepository;
+import com.golmok.market.domain.trade.TradeStatus;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
@@ -47,6 +50,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ProductThumbnails productThumbnails;
     private final ApplicationEventPublisher eventPublisher;
+    private final TradeRepository tradeRepository;
 
     /** 채팅하기 결과. 새 방이면 201, 기존 방이면 200 으로 답하기 위해 생성 여부를 함께 돌려준다. */
     public record OpenResult(ChatRoomResponse room, boolean created) {
@@ -74,7 +78,7 @@ public class ChatService {
             // 거래가 끝난 상품이라도 이전 대화는 다시 볼 수 있어야 한다. 나갔던 방이면 목록에 되살린다.
             ChatRoom room = existing.get();
             room.rejoinAsBuyer();
-            return new OpenResult(toResponse(room, viewer), false);
+            return new OpenResult(describe(room, viewer), false);
         }
 
         if (product.getStatus() == ProductStatus.SOLD) {
@@ -83,7 +87,7 @@ public class ChatService {
         ChatRoom room = chatRoomRepository.save(
                 ChatRoom.open(product, userRepository.getReferenceById(viewer.id())));
         productRepository.incrementChatCount(productId);
-        return new OpenResult(toResponse(room, viewer), true);
+        return new OpenResult(describe(room, viewer), true);
     }
 
     /** 내 채팅 목록. 최근 메시지 순. */
@@ -117,7 +121,7 @@ public class ChatService {
         ChatRoom room = chatRoomRepository.findWithDetails(roomId)
                 .filter(found -> found.isActiveParticipant(viewer.id()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        return toResponse(room, viewer);
+        return describe(room, viewer);
     }
 
     /**
@@ -149,8 +153,20 @@ public class ChatService {
         ChatRoom room = chatRoomRepository.findByIdForUpdate(roomId)
                 .filter(found -> found.isActiveParticipant(viewer.id()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        ChatMessage message = chatMessageRepository.save(
-                ChatMessage.text(room, userRepository.getReferenceById(viewer.id()), request.content()));
+        return post(room, ChatMessage.text(room, userRepository.getReferenceById(viewer.id()), request.content()));
+    }
+
+    /**
+     * 거래 상태 변경 같은 안내를 채팅방에 남긴다. 호출한 쪽의 트랜잭션에 참여하고, 방 잠금은 호출한 쪽이 잡는다.
+     * 일반 메시지와 같은 경로라 목록 미리보기·상대 목록 복귀·실시간 전달이 그대로 적용된다.
+     */
+    @Transactional
+    public ChatMessageResponse postSystemMessage(ChatRoom room, long actorId, String content) {
+        return post(room, ChatMessage.system(room, userRepository.getReferenceById(actorId), content));
+    }
+
+    private ChatMessageResponse post(ChatRoom room, ChatMessage message) {
+        chatMessageRepository.save(message);
         room.recordMessage(message);
         ChatMessageResponse response = ChatMessageResponse.from(message);
         eventPublisher.publishEvent(new ChatMessageSentEvent(participantIds(room), response));
@@ -194,8 +210,11 @@ public class ChatService {
         return List.of(room.getBuyer().getId(), room.getSeller().getId());
     }
 
-    private ChatRoomResponse toResponse(ChatRoom room, AuthUser viewer) {
+    /** 채팅방 응답. 이 방의 현재 거래(취소·환불 제외 최신)와 누를 수 있는 거래 버튼을 함께 담는다. */
+    public ChatRoomResponse describe(ChatRoom room, AuthUser viewer) {
         Long productId = room.getProduct().getId();
-        return ChatRoomResponse.of(room, viewer.id(), productThumbnails.of(List.of(productId)).get(productId));
+        Trade trade = tradeRepository.findFirstByChatRoomIdAndStatusNotInOrderByIdDesc(
+                room.getId(), List.of(TradeStatus.CANCELED, TradeStatus.REFUNDED)).orElse(null);
+        return ChatRoomResponse.of(room, viewer.id(), productThumbnails.of(List.of(productId)).get(productId), trade);
     }
 }

@@ -4,6 +4,7 @@ import com.golmok.market.domain.category.*;
 import com.golmok.market.domain.region.*;
 import com.golmok.market.domain.user.*;
 import com.golmok.market.domain.image.*;
+import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.global.security.AuthUser;
 import com.golmok.market.global.error.BusinessException;
 import jakarta.persistence.EntityManager;
@@ -26,11 +27,12 @@ class ProductWriteServiceTest {
     @Autowired UserRepository users;
     @Autowired UserRegionRepository userRegions;
     @Autowired ImageUrlValidator validator;
+    @Autowired TradeRepository trades;
     @Autowired EntityManager em;
 
     @Test void 서비스는_주입된_시계로_정확히_24시간_경계를_판단한다() {
         Clock clock = Clock.fixed(Instant.parse("2026-09-16T03:00:00Z"), ZoneId.of("Asia/Seoul"));
-        ProductService service = new ProductService(products, images, favorites, thumbnails, categories, users, userRegions, validator, clock);
+        ProductService service = new ProductService(products, images, favorites, thumbnails, categories, users, userRegions, validator, trades, clock);
         User seller = users.save(User.builder().email("clock@test.com").password("hash").nickname("시계판매자").build());
         Category category = categories.save(Category.create(null, "시계가구", null, 1));
         Region region = regions.save(Region.create("서울", "강남", "역삼동", 37.5, 127));
