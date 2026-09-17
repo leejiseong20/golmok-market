@@ -1,18 +1,25 @@
 package com.golmok.market.domain.chat;
 
 import com.golmok.market.domain.user.User;
+import com.golmok.market.global.entity.BaseCreatedTimeEntity;
+import com.golmok.market.global.error.BusinessException;
+import com.golmok.market.global.error.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
+/**
+ * 채팅 메시지. 수정·삭제 기능은 두지 않는다(대화 기록이 거래 분쟁의 근거가 된다).
+ *
+ * is_read 는 1:1 방이라 "상대가 읽었는가" 하나면 충분하다.
+ * 그룹 채팅이었다면 사용자별 마지막 읽은 메시지 id 를 따로 저장해야 한다.
+ */
 @Entity
 @Getter
 @Table(name = "chat_messages")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ChatMessage {
+public class ChatMessage extends BaseCreatedTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,9 +43,6 @@ public class ChatMessage {
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
-    private LocalDateTime createdAt;
-
     private ChatMessage(ChatRoom room, User sender, MessageType type, String content) {
         this.room = room;
         this.sender = sender;
@@ -47,8 +51,8 @@ public class ChatMessage {
     }
 
     public static ChatMessage text(ChatRoom room, User sender, String content) {
-        if (!room.isParticipant(sender.getId())) {
-            throw new IllegalArgumentException("이 채팅방의 참여자가 아닙니다.");
+        if (!room.isActiveParticipant(sender.getId())) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND);
         }
         return new ChatMessage(room, sender, MessageType.TEXT, content);
     }

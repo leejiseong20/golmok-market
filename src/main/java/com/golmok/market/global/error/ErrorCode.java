@@ -64,7 +64,13 @@ public enum ErrorCode {
 
     // ---------- 거래 ----------
     TRADE_NOT_FOUND(HttpStatus.NOT_FOUND, "거래 내역을 찾을 수 없습니다."),
-    CANNOT_BUY_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 구매할 수 없습니다.");
+    CANNOT_BUY_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 구매할 수 없습니다."),
+
+    // ---------- 채팅 ----------
+    // 남의 방·이미 나간 방도 이 코드로 답한다. 403 을 주면 그 id 의 방이 존재한다는 사실이 드러난다.
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."),
+    CANNOT_CHAT_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품에는 채팅을 걸 수 없습니다."),
+    PRODUCT_NOT_CHATTABLE(HttpStatus.BAD_REQUEST, "거래가 완료된 상품에는 새 채팅을 시작할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

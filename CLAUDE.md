@@ -28,7 +28,7 @@
 
 ## 파일
 
-- `API-SPEC.md` — API 명세 (1단계: 인증/상품/찜/카테고리/동네/검색)
+- `API-SPEC.md` — API 명세 (인증/상품/찜/카테고리/동네/검색/거래 일부/채팅)
 - `golmok_schema_v2.sql` — 실제 DB 스키마. 이게 기준이다.
 
 ## 진행 상황
@@ -53,7 +53,10 @@
 - [완료] 배포 준비: Dockerfile, GitHub Actions(테스트 → GHCR 이미지), `deploy/`(서버 한 대 Docker Compose: MySQL · 앱 · Caddy HTTPS), 데모 시드 스크립트, 단계별 안내(`deploy/README.md`). 프론트 `vercel.json`
 - [검증] 2026-09-17 운영 Compose 구성을 로컬 Docker로 실제 기동: 스키마 자동 적용, HTTPS 경유 API, HTTP→HTTPS 리다이렉트, 앱·DB 포트 비노출, CORS 허용/차단, 데모 시드, 이미지 업로드·서빙, 앱 컨테이너 재생성 후 이미지 유지, 운영 로그에 SQL 값 없음. 메모리 앱 290MB(튜닝 전 461MB) · MySQL 160MB · Caddy 15MB, 요청 60회 실패 0
 - [완료] 배포 대상을 AWS EC2 에서 Oracle Cloud 상시 무료로 변경. 이미지를 x86·ARM 으로 함께 빌드, 안내서를 Oracle 기준으로 재작성
-- [다음] **실제 배포(Oracle Cloud 가입·서버·DuckDNS·Vercel은 사용자 작업)** → 채팅 → 거래·리뷰 → 결제·알림
+- [보류] 실제 배포. Oracle Cloud 서버 만들기에서 중단(2026-09-17). 기능 개발을 먼저 하고 나중에 다시 한다. `deploy/README.md`는 Oracle 기준이라 재개할 때 대상에 맞게 고친다.
+- [완료] 채팅 1단계(REST): 채팅하기(기존 방 재사용)·목록(안 읽은 수)·방 조회·메시지 조회/전송·읽음·나가기. `chatCount` 원자적 증가
+- [검증] 2026-09-17 테스트 281개 → 301개(실패 0). 채팅 API 19개 + 동시 채팅하기 1개. 상품 잠금을 빼면 동시성 테스트가 UNIQUE 위반으로 실패함을 확인했다. 실제 MySQL·프론트 연결은 아직 안 했다.
+- [다음] 채팅 2단계(WebSocket 실시간) → 채팅 화면(프론트) → 거래 생성·리뷰 → 결제·알림
 
 ## 알려진 과제
 
@@ -62,7 +65,7 @@
 - 데모 사진은 외부 picsum URL이다. 조회는 유지하지만 상품 수정 시 서버에 새로 올린 사진으로 교체해야 한다.
 - 실제 브라우저 검증이 만든 `write-<실행식별자>@golmok.test` 계정과 업로드 파일은 남는다. 검증 상품은 해당 실행의 ID만 soft delete했다. 사용자 실계정과 기존 데모 상품은 수정하지 않았다. 전체 데모 정리 SQL은 실행하지 않았다.
 
-- 엔티티 6개(`ChatRoom`, `ChatMessage`, `Notification`, `SearchLog`, `Payment`, `Review`)의 `created_at`이 `insertable = false`(DB 기본값 의존)다. H2 테스트에서 INSERT가 실패하고, 저장 직후 `createdAt`이 null이다. 각 도메인 구현 시 `BaseCreatedTimeEntity`로 바꾼다. (`RefreshToken`, `Region`, `ProductImage`, `Favorite`은 완료)
+- 엔티티 4개(`Notification`, `SearchLog`, `Payment`, `Review`)의 `created_at`이 `insertable = false`(DB 기본값 의존)다. H2 테스트에서 INSERT가 실패하고, 저장 직후 `createdAt`이 null이다. 각 도메인 구현 시 `BaseCreatedTimeEntity`로 바꾼다. (`RefreshToken`, `Region`, `ProductImage`, `Favorite`, `ChatRoom`, `ChatMessage`는 완료)
 - 엔티티가 비즈니스 규칙 위반 시 `IllegalArgumentException`/`IllegalStateException`을 던진다. 403이어야 할 것(참여자 아님 등)도 400이 된다. 각 도메인 구현 시 `BusinessException`으로 바꾼다.
 - 동네 인증에 **반경 제한이 없다.** 지금은 어디서 눌러도 가장 가까운 동네로 인증된다. `regions`에 동네가 3개뿐이라 반경을 걸면 시연이 불가능하기 때문이다. 동네 데이터를 실제로 채울 때(행정동 전체 적재) 반경 제한과 인증 횟수 제한(하루 1회 등)을 함께 도입한다.
 - `JwtAuthenticationFilter`는 `Bearer `로 시작하지 않는 Authorization 헤더를 무시한다. 형식 오류 토큰을 401로 처리한다는 명세와 어긋날 여지가 있어 별도 정책 정리가 필요하다. 이번 조회 작업에서는 변경하지 않았다.
@@ -73,7 +76,12 @@
 - (해결) 스키마 SQL의 UNIQUE 제약을 엔티티에도 모두 선언했다. 누락되면 `SchemaConstraintTest`가 빌드에서 잡는다. 새 테이블을 추가할 때 `@Table(uniqueConstraints = ...)`를 빠뜨리지 말 것.
 - (해결) 마이페이지 판매내역 탭 미구현: 판매내역·상태 필터를 연결했다. 프로필 수정(`PATCH /api/users/me`)은 아직 미구현이다.
 - 거래는 조회와 구매확정만 있다. **거래를 만드는 API가 없어** 구매내역 데이터는 시드로만 생긴다. 거래 요청·결제·취소·환불은 2단계에서 채팅·결제와 함께 만든다.
-- `Review`, `ChatRoom`, `ChatMessage`는 아직 `IllegalArgumentException`/`IllegalStateException`을 던진다. 해당 도메인 구현 시 `BusinessException`으로 바꾼다. (`Product`, `Trade`는 완료)
+- `Review`는 아직 `IllegalArgumentException`/`IllegalStateException`을 던진다. 해당 도메인 구현 시 `BusinessException`으로 바꾼다. (`Product`, `Trade`, `ChatRoom`, `ChatMessage`는 완료)
+- 채팅방을 나갔다가 상대 메시지로 다시 나타나면 **나가기 전 대화도 보인다.** 스키마에 나간 시점이 없고 `buyer_left`/`seller_left` 불리언뿐이라서다. 당근마켓처럼 이전 대화를 가리려면 `buyer_left_at`·`seller_left_at` 컬럼이 필요하다(스키마 변경).
+- 운영 MySQL 의 `last_message_at`은 `DATETIME`(초 단위)이라 **같은 초에 메시지가 온 방끼리는 방 id 순**으로 정렬된다. 채팅 목록에서 거의 동시에 온 두 방의 순서가 실제 수신 순서와 다를 수 있다. 정확히 하려면 `DATETIME(6)`으로 바꿔야 한다(스키마 변경).
+- 채팅 목록 쿼리는 구매자·판매자 조건이 OR 라 인덱스 하나로 끝나지 않는다. 방이 많아지면 MySQL EXPLAIN 으로 확인하고, 필요하면 두 쿼리로 나눠 병합한다.
+- 채팅은 아직 실시간이 아니다. 상대 메시지는 다시 불러와야 보인다(2단계 WebSocket).
+- 채팅의 이미지 메시지(`IMAGE`)·시스템 메시지(`SYSTEM`)는 엔티티만 있고 API 가 없다.
 - 운영은 **서버 한 대**(단일 장애점)이고 DB 백업이 수동이다. 이미지는 서버 디스크 볼륨이라 서버를 지우면 사라진다(오브젝트 스토리지 이전은 후속). 상시 무료 서버는 사용률이 낮으면 회수될 수 있어 DB 백업을 정기적으로 받아야 한다.
 - 운영 데모 계정 비밀번호가 공개돼 누구나 데모 상품을 고치거나 지울 수 있다. 망가지면 `clean_demo_data.sql` 후 `deploy/seed-demo.sh`로 다시 넣는다.
 - 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 운영은 `deploy/.env`로 주입하고 시간대는 Dockerfile 에서 `Asia/Seoul`로 고정한다.
@@ -90,6 +98,14 @@
 - **상품 쓰기와 구매확정은 상품 행 잠금을 공유한다.** 상품→거래 순서로 잠근 뒤 최신 상태를 검사한다. 동시에 들어온 끌어올리기나 상태 변경의 중복 처리를 막으며 스키마 버전 컬럼은 추가하지 않는다. `viewCount`·`favoriteCount`의 updatable=false는 그대로다.
 - **판매자가 먼저 SOLD로 표시했더라도 구매확정은 허용한다.** 이전 Trade.confirm()은 markSold()가 이미 SOLD를 거부해 실패했다. 거래의 PAID/SHIPPING 검증은 유지하고, 이미 SOLD면 상품 전이만 생략한다. 상품 표시와 구매자 수령 확인을 분리하기 위한 변경이다.
 - **판매내역은 createdAt DESC, id DESC 커서다.** 기존 Cursor/PageSize/CursorResponse와 ProductThumbnails를 재사용하고 삭제 상품은 제외한다. 상품 쓰기 응답은 상세 GET을 재호출하지 않아 조회수를 올리지 않는다.
+- **2026-09-17 배포를 미루고 기능 개발을 먼저 한다.** Oracle Cloud 서버 생성·SSH 접속 과정이 복잡해 중단했다. 유료 호스팅은 쓰지 않는다. 배포 준비물(Dockerfile·CI·Compose)은 검증된 상태로 두고, 재개 시 대상만 정한다.
+- **채팅하기는 상품 행 잠금으로 방 만들기를 한 줄로 세운다.** 찜처럼 UNIQUE 위반을 잡아 처리하지 않는 이유: 위반이 난 트랜잭션은 롤백 전용이 되어 같은 트랜잭션에서 기존 방을 다시 조회해 돌려줄 수 없다. 기존 방 조회도 잠금 조회로 한다. REPEATABLE READ 의 일반 SELECT 는 잠금을 기다리는 동안 먼저 커밋된 방을 못 볼 수 있다. UNIQUE `(product_id, buyer_id)`는 최종 방어선이다.
+- **채팅방의 모든 기능은 "나가지 않은 참여자"만 쓰고, 아니면 404다.** 남의 방에 403을 주면 그 방이 있다는 사실이 드러난다(거래와 같은 규칙).
+- **메시지 전송은 방 행을 잠근다.** 잠그지 않으면 거의 동시에 보낸 두 메시지의 커밋 순서가 뒤바뀌어 목록의 `last_message`가 실제 마지막 메시지와 달라질 수 있다.
+- **채팅 응답은 요청자 기준(`opponent`, `myRole`)이다.** buyer/seller 를 그대로 주면 프론트가 매번 자기 id 와 비교해야 한다.
+- **메시지 조회는 읽음 처리를 하지 않는다.** GET 에 부수효과를 두지 않고, 화면이 실제로 보일 때 `PATCH /read`를 따로 부른다. 안 읽은 수는 목록 한 페이지의 방 id 로 한 번에 센다(방마다 COUNT 를 보내지 않는다).
+- **메시지 커서는 id 하나로 정렬하지만 형식은 `{id}_{id}`로 둔다.** 인덱스 `(room_id, id DESC)` 그대로 쓰고, API 전체의 커서 형식과 파서를 하나로 유지하기 위해서다.
+- **메시지가 없는 방은 채팅 목록에서 뺀다.** "채팅하기"만 누르고 떠난 방이 판매자 목록에 쌓이지 않게 한다. `chat_count`는 방이 생길 때 오르므로 말없이 떠난 방도 센다.
 
 왜 이렇게 했는지. 나중에 뒤집으려 할 때 먼저 읽을 것.
 

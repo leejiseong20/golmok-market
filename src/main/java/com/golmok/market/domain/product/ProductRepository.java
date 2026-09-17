@@ -53,6 +53,18 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
             """)
     int decrementFavoriteCount(long id);
 
+    /**
+     * 채팅방이 새로 생겼을 때만 호출한다. 찜 수와 같은 이유로 DB 에서 더한다.
+     * 영속성 컨텍스트를 비우지 않는다. 호출한 쪽이 잠근 상품으로 응답을 만들어야 하고,
+     * chat_count 는 updatable = false 라 남아 있는 엔티티가 증가분을 덮어쓰지 않는다.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Product p set p.chatCount = p.chatCount + 1, p.updatedAt = p.updatedAt
+            where p.id = :id
+            """)
+    int incrementChatCount(long id);
+
     /** 증감 직후의 값만 필요할 때. 상품 전체를 다시 읽지 않는다. */
     @Query("select p.favoriteCount from Product p where p.id = :id")
     int findFavoriteCount(long id);
