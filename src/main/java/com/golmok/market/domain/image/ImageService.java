@@ -29,9 +29,12 @@ import java.util.UUID;
 public class ImageService {
 
     public static final String URL_PREFIX = "/api/images/";
+    /** 축소본은 원본과 같은 이름으로 이 폴더 아래 같은 날짜 경로에 둔다(주소 규칙만으로 찾을 수 있다). */
+    public static final String THUMBNAIL_DIR = "thumb";
     private static final DateTimeFormatter DATE_PATH = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     private final ImageProperties properties;
+    private final ImageResizer resizer;
     private final Clock clock;
 
     public List<String> upload(List<MultipartFile> files) {
@@ -61,6 +64,7 @@ public class ImageService {
                 Path target = directory.resolve(name);
                 Files.write(target, content);
                 written.add(target);
+                writeThumbnail(datePath, name, content, type, written);
                 urls.add(URL_PREFIX + datePath + "/" + name);
             }
             return urls;
@@ -72,6 +76,23 @@ public class ImageService {
             log.error("이미지 저장 실패", e);
             throw new BusinessException(ErrorCode.INTERNAL_ERROR);
         }
+    }
+
+    /**
+     * 축소본을 같이 저장한다. 만들지 못하면(webp · 이미 작은 사진) 아무것도 남기지 않고,
+     * 조회 때 원본으로 대신한다(ImageController.thumbnail).
+     */
+    private void writeThumbnail(String datePath, String name, byte[] content, ImageType type, List<Path> written)
+            throws IOException {
+        byte[] thumbnail = resizer.resize(content, type, properties.thumbnailMaxEdge());
+        if (thumbnail == null) {
+            return;
+        }
+        Path directory = Path.of(properties.uploadDir(), THUMBNAIL_DIR, datePath);
+        Files.createDirectories(directory);
+        Path target = directory.resolve(name);
+        Files.write(target, thumbnail);
+        written.add(target);
     }
 
     private byte[] read(MultipartFile file) throws IOException {

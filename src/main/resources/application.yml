@@ -39,6 +39,7 @@ app:
     # 로컬 디스크. 배포 시 볼륨을 붙이거나 S3 로 옮겨야 한다.
     upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
     max-count: 10
+    thumbnail-max-edge: ${IMAGE_THUMBNAIL_MAX_EDGE:640}
   scheduling:
     # 예약 작업(정리 배치)을 켤지. 끄면 정리 작업은 직접 실행할 때만 돈다.
     enabled: ${SCHEDULING_ENABLED:true}
