@@ -1,0 +1,14 @@
+[Unit]
+# 부팅 직후와 5분마다(timer) 도메인을 현재 공인 IP 로 맞춘다.
+# Learner Lab 은 세션이 끝나면 EC2 를 멈추고, 다시 켜면 IP 가 바뀌기 때문이다.
+Description=DuckDNS 도메인을 현재 공인 IP 로 갱신
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/golmok-market/deploy/duckdns-update.sh
+# 부팅 직후에는 네트워크가 아직 안 잡혀 실패할 수 있다. 몇 번 다시 시도한다.
+Restart=on-failure
+RestartSec=10s

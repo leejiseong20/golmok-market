@@ -1,0 +1,11 @@
+[Unit]
+Description=DuckDNS 갱신 주기 실행
+
+[Timer]
+# 부팅 30초 뒤 한 번, 그 뒤로는 5분마다. 세션을 다시 시작해 IP 가 바뀌어도 곧 따라간다.
+OnBootSec=30s
+OnUnitActiveSec=5min
+Unit=duckdns-update.service
+
+[Install]
+WantedBy=timers.target

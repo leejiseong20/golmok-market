@@ -53,6 +53,7 @@
 - [완료] 배포 준비: Dockerfile, GitHub Actions(테스트 → GHCR 이미지), `deploy/`(서버 한 대 Docker Compose: MySQL · 앱 · Caddy HTTPS), 데모 시드 스크립트, 단계별 안내(`deploy/README.md`). 프론트 `vercel.json`
 - [검증] 2026-09-17 운영 Compose 구성을 로컬 Docker로 실제 기동: 스키마 자동 적용, HTTPS 경유 API, HTTP→HTTPS 리다이렉트, 앱·DB 포트 비노출, CORS 허용/차단, 데모 시드, 이미지 업로드·서빙, 앱 컨테이너 재생성 후 이미지 유지, 운영 로그에 SQL 값 없음. 메모리 앱 290MB(튜닝 전 461MB) · MySQL 160MB · Caddy 15MB, 요청 60회 실패 0
 - [완료] 배포 대상을 AWS EC2 에서 Oracle Cloud 상시 무료로 변경. 이미지를 x86·ARM 으로 함께 빌드, 안내서를 Oracle 기준으로 재작성
+- [진행] 배포 대상: **연습·시연은 AWS Academy Learner Lab**(2026-09-18 결정), 상시 주소는 Oracle Cloud 상시 무료. 랩은 세션 4시간·종료 시 EC2 중지·예산 $50·강의 종료 시 접근 종료라 상시 링크로 쓸 수 없다. 대신 절차가 Oracle 과 거의 같아 먼저 완주해 보고 그대로 옮긴다.
 - [보류] 실제 배포. Oracle Cloud 서버 만들기에서 중단(2026-09-17). 기능 개발을 먼저 하고 나중에 다시 한다. `deploy/README.md`는 Oracle 기준이라 재개할 때 대상에 맞게 고친다.
 - [완료] 채팅 1단계(REST): 채팅하기(기존 방 재사용)·목록(안 읽은 수)·방 조회·메시지 조회/전송·읽음·나가기. `chatCount` 원자적 증가
 - [검증] 2026-09-17 테스트 281개 → 301개(실패 0). 채팅 API 19개 + 동시 채팅하기 1개. 상품 잠금을 빼면 동시성 테스트가 UNIQUE 위반으로 실패함을 확인했다. 실제 MySQL·프론트 연결은 아직 안 했다.
@@ -82,7 +83,9 @@
 - [검증] 2026-09-17 테스트 397개 → 409개(실패 0). 탈퇴 API 8개(정리 범위·로그인/프로필/후기/내 정보 차단·채팅 전송 거부·탈퇴 구매자 예약 거부·비밀번호 틀림·판매자/구매자 진행 중 거래 409·입력 오류/비로그인), 안 읽은 합계 3개, 탈퇴 회원 알림 생략 1개. 알림 생략 조건을 빼면 해당 테스트가 실패함을 확인했다. 실제 MySQL + Vite 프록시로 임시 계정 두 개(`withdraw-<실행ID>-a/b@golmok.test`) 흐름 13개 확인(`codex-handoff/scripts/withdrawal-live-check.mjs`). 익명화된 탈퇴 회원 행·b 계정·채팅방·삭제된 확인용 상품이 남는다. 스키마 변경 없음.
 - [완료] 목록용 썸네일: 업로드 때 긴 변 640px 축소본을 `uploads/thumb/{날짜}/{같은 이름}` 에 함께 저장하고 `GET /api/images/thumb/**` 로 서빙한다. 축소본이 없으면(webp · 이미 작은 사진 · 기능 도입 전 사진) 원본을 대신 내려준다. 스키마·의존성 변경 없음(ImageIO)
 - [검증] 2026-09-18 테스트 409개 → 415개(실패 0). 썸네일 6개(비율 유지 축소·작은 사진 건너뜀·webp 업로드 성공·조회 시 대체·없는 사진 404 와 경로 조작 차단·깨진 파일 건너뜀). 실제 서버 + Vite 프록시로 1600x1200 PNG 가 640x480 으로 내려오고 작은 사진은 원본으로 대신하는 것을 확인했다(`codex-handoff/scripts/thumbnail-live-check.mjs`). 확인용 계정 `thumb-<실행ID>@golmok.test` 와 사진 2장이 남는다.
-- [다음] 미정
+- [완료] AWS Academy Learner Lab 배포 안내서(`deploy/README-learner-lab.md`)와 DuckDNS 자동 갱신(`deploy/duckdns-update.sh` + systemd service·timer). 랩은 세션이 끝나면 EC2 가 멈추고 다시 켜면 공인 IP 가 바뀌는데, 탄력적 IP 는 꺼져 있는 동안에도 예산을 갉아먹으므로 부팅 30초 뒤와 5분마다 도메인을 현재 IP 로 맞춘다.
+- [검증] 2026-09-18 스크립트를 가짜 curl 로 돌려 정상 갱신·DuckDNS 실패 감지·설정 누락 세 경우를 확인했다(`bash -n` 문법 검사 포함). **실제 AWS 배포는 아직 하지 않았다**(콘솔 접근이 필요하다).
+- [다음] Learner Lab 에 실제 배포
 
 ## 알려진 과제
 

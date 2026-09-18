@@ -1,5 +1,9 @@
 # 골목마켓 배포 안내 (Oracle Cloud 상시 무료 + Vercel)
 
+> **AWS Academy Learner Lab 으로 연습·시연한다면 [README-learner-lab.md](README-learner-lab.md) 를 본다.**
+> 서버를 만드는 방법만 다르고, 실행·데모 데이터·프론트 연결·백업은 이 문서의 6~8단계를 그대로 쓴다.
+> 랩은 세션이 끝나면 서버가 멈추므로 상시 운영에는 쓸 수 없다.
+
 ```
 사용자 ─HTTPS→ Vercel (React 프론트)
                   │  /api/* 를 백엔드로 전달
