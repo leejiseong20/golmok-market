@@ -53,8 +53,8 @@
 - [완료] 배포 준비: Dockerfile, GitHub Actions(테스트 → GHCR 이미지), `deploy/`(서버 한 대 Docker Compose: MySQL · 앱 · Caddy HTTPS), 데모 시드 스크립트, 단계별 안내(`deploy/README.md`). 프론트 `vercel.json`
 - [검증] 2026-09-17 운영 Compose 구성을 로컬 Docker로 실제 기동: 스키마 자동 적용, HTTPS 경유 API, HTTP→HTTPS 리다이렉트, 앱·DB 포트 비노출, CORS 허용/차단, 데모 시드, 이미지 업로드·서빙, 앱 컨테이너 재생성 후 이미지 유지, 운영 로그에 SQL 값 없음. 메모리 앱 290MB(튜닝 전 461MB) · MySQL 160MB · Caddy 15MB, 요청 60회 실패 0
 - [완료] 배포 대상을 AWS EC2 에서 Oracle Cloud 상시 무료로 변경. 이미지를 x86·ARM 으로 함께 빌드, 안내서를 Oracle 기준으로 재작성
-- [진행] 배포 대상: **연습·시연은 AWS Academy Learner Lab**(2026-09-18 결정), 상시 주소는 Oracle Cloud 상시 무료. 랩은 세션 4시간·종료 시 EC2 중지·예산 $50·강의 종료 시 접근 종료라 상시 링크로 쓸 수 없다. 대신 절차가 Oracle 과 거의 같아 먼저 완주해 보고 그대로 옮긴다.
-- [보류] 실제 배포. Oracle Cloud 서버 만들기에서 중단(2026-09-17). 기능 개발을 먼저 하고 나중에 다시 한다. `deploy/README.md`는 Oracle 기준이라 재개할 때 대상에 맞게 고친다.
+- (해결) 배포 대상: **연습·시연은 AWS Academy Learner Lab**(2026-09-18 결정, 같은 날 배포 완료), 상시 주소는 Oracle Cloud 상시 무료. 랩은 세션 4시간·종료 시 EC2 중지·예산 $50·강의 종료 시 접근 종료라 상시 링크로 쓸 수 없다. 대신 절차가 Oracle 과 거의 같아 먼저 완주해 보고 그대로 옮긴다.
+- (해결) [보류] 이던 실제 배포: 2026-09-18 Learner Lab 에 배포했다. Oracle Cloud 서버 만들기에서 중단했던 것(2026-09-17)은 그대로 남아 있고, `deploy/README.md` 는 Oracle 기준이라 상시 주소로 옮길 때 그대로 쓸 수 있다.
 - [완료] 채팅 1단계(REST): 채팅하기(기존 방 재사용)·목록(안 읽은 수)·방 조회·메시지 조회/전송·읽음·나가기. `chatCount` 원자적 증가
 - [검증] 2026-09-17 테스트 281개 → 301개(실패 0). 채팅 API 19개 + 동시 채팅하기 1개. 상품 잠금을 빼면 동시성 테스트가 UNIQUE 위반으로 실패함을 확인했다. 실제 MySQL·프론트 연결은 아직 안 했다.
 - [완료] 채팅 2단계(실시간): STOMP over WebSocket(`/api/ws`), CONNECT 시 JWT 인증, 개인 큐(`/user/queue/chat`)로 새 메시지·읽음 이벤트를 커밋 후 전달
@@ -85,7 +85,9 @@
 - [검증] 2026-09-18 테스트 409개 → 415개(실패 0). 썸네일 6개(비율 유지 축소·작은 사진 건너뜀·webp 업로드 성공·조회 시 대체·없는 사진 404 와 경로 조작 차단·깨진 파일 건너뜀). 실제 서버 + Vite 프록시로 1600x1200 PNG 가 640x480 으로 내려오고 작은 사진은 원본으로 대신하는 것을 확인했다(`codex-handoff/scripts/thumbnail-live-check.mjs`). 확인용 계정 `thumb-<실행ID>@golmok.test` 와 사진 2장이 남는다.
 - [완료] AWS Academy Learner Lab 배포 안내서(`deploy/README-learner-lab.md`)와 DuckDNS 자동 갱신(`deploy/duckdns-update.sh` + systemd service·timer). 랩은 세션이 끝나면 EC2 가 멈추고 다시 켜면 공인 IP 가 바뀌는데, 탄력적 IP 는 꺼져 있는 동안에도 예산을 갉아먹으므로 부팅 30초 뒤와 5분마다 도메인을 현재 IP 로 맞춘다.
 - [검증] 2026-09-18 스크립트를 가짜 curl 로 돌려 정상 갱신·DuckDNS 실패 감지·설정 누락 세 경우를 확인했다(`bash -n` 문법 검사 포함). **실제 AWS 배포는 아직 하지 않았다**(콘솔 접근이 필요하다).
-- [다음] Learner Lab 에 실제 배포
+- [완료] **실제 배포(2026-09-18).** AWS Academy Learner Lab 의 EC2(Ubuntu 24.04 · t3.small · us-east-1)에 Docker Compose 로 MySQL·백엔드·Caddy 를 띄우고, DuckDNS 도메인에 Let's Encrypt HTTPS 를 붙였다. 프론트는 Vercel(https://golmok-market-frontend.vercel.app), API 는 `vercel.json` rewrites 로 백엔드(golmok-api.duckdns.org)에 전달한다.
+- [검증] 2026-09-18 외부 인터넷에서 확인: 백엔드 `/api/categories` 200(응답 0.8초)·인증서 검증 통과, Vercel 홈 200·`/api` 프록시 200, 브라우저(비로그인)로 동네 선택 → 상품 20개 목록·사진·상태 뱃지 표시. CORS 는 Vercel Origin 으로 `Access-Control-Allow-Origin` 응답 확인. **사용자가 로그인·채팅·휴대폰 접속까지 확인해 "기능이 모두 작동"이라고 확인했다.** 실제로 해보며 문서와 달랐던 두 가지(서울 리전 AMI 오류 → us-east-1, Windows 는 `chmod` 가 아니라 `icacls` 로 키 권한 조정)를 `deploy/README-learner-lab.md` 에 반영했다.
+- [다음] 미정. 상시 주소가 필요하면 Oracle Cloud 로 이전(`deploy/README.md`), 그다음 후보는 PWA
 
 ## 알려진 과제
 
@@ -140,6 +142,8 @@
 - 찜 알림 합치기는 "안 읽은 알림 있음" 확인 후 저장이라, 두 사람이 거의 동시에 찜하면 안 읽은 찜 알림이 두 개 생길 수 있다. 알림 중복일 뿐 데이터 무결성 문제는 아니라 잠금을 두지 않았다.
 - 알림은 앱이 열려 있을 때만 실시간으로 받는다. 브라우저 푸시(탭을 닫아도 오는 알림)는 없다.
 - 채팅의 이미지 메시지(`IMAGE`)는 엔티티만 있고 API가 없다. (해결) 시스템 메시지(`SYSTEM`)는 직거래 예약·취소·완료에서 생성하며 이전 과제 기록이 갱신되지 않았었다.
+- **현재 배포는 랩 세션이 살아 있는 동안에만 열린다.** Learner Lab 은 세션(4시간)이 끝나면 EC2 를 멈추고, 강의가 끝나면 접근이 종료된다. 이력서에 적을 상시 주소는 Oracle Cloud 로 옮겨야 한다. 세션을 다시 시작하면 공인 IP 가 바뀌지만 `duckdns-update.timer` 가 도메인을 맞춘다(컨테이너는 `restart: unless-stopped` 로 함께 올라온다).
+- 배포된 데모 계정 비밀번호는 시드 스크립트에 공개돼 있어 **누구나 로그인해 데모 데이터를 고치거나 지울 수 있다.** 망가지면 `clean_demo_data.sql` 후 `seed-demo.sh`.
 - 운영은 **서버 한 대**(단일 장애점)이고 DB 백업이 수동이다. 이미지는 서버 디스크 볼륨이라 서버를 지우면 사라진다(오브젝트 스토리지 이전은 후속). 상시 무료 서버는 사용률이 낮으면 회수될 수 있어 DB 백업을 정기적으로 받아야 한다.
 - 운영 데모 계정 비밀번호가 공개돼 누구나 데모 상품을 고치거나 지울 수 있다. 망가지면 `clean_demo_data.sql` 후 `deploy/seed-demo.sh`로 다시 넣는다.
 - 실행 시 `DB_PASSWORD`, `JWT_SECRET`(Base64, 256비트 이상) 필요. 운영은 `deploy/.env`로 주입하고 시간대는 Dockerfile 에서 `Asia/Seoul`로 고정한다.

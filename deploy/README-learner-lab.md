@@ -1,6 +1,7 @@
 # 골목마켓 배포 — AWS Academy Learner Lab 기준
 
 **이 문서는 "배포 연습과 면접 시연"용이다. 24시간 살아 있는 주소를 만드는 방법이 아니다.**
+*2026-09-18 이 순서대로 실제 배포에 성공했다(Ubuntu 24.04 · t3.small · us-east-1).*
 상시 운영은 [README.md](README.md)(Oracle Cloud 상시 무료)를 따른다. 실행 방법 자체는 두 문서가 같다.
 
 ```
@@ -37,12 +38,34 @@ Learner Lab 안내문에 적힌 내용이고, 이 문서의 구성은 전부 여
 2. **AWS** 링크를 누르면 AWS 콘솔이 열린다.
 3. **AWS Details → Download PEM** 으로 키 파일(`labsuser.pem`)을 내려받는다. SSH 접속에 쓴다.
    - 랩을 새로 시작해도 같은 키(`vockey`)를 쓴다. 파일은 한 번만 받아 두면 된다.
-4. 리전은 보통 **N. Virginia(us-east-1)** 로 고정돼 있다. 바꾸지 않는다.
+4. 리전을 **N. Virginia(us-east-1)** 로 맞춘다. 콘솔 오른쪽 위에서 바꾼다.
+   - 서울(ap-northeast-2)에서 인스턴스를 만들려고 하면 **AMI 오류**가 난다(랩이 허용한 리전이 아니다). 실제로 여기서 한 번 막혔다.
+
+키 파일은 권한을 좁혀 둬야 한다. 넓으면 ssh 가 `UNPROTECTED PRIVATE KEY FILE!` 로 거부한다.
+
+**macOS · Linux · Git Bash**
 
 ```bash
-# 내려받은 키는 권한을 좁혀 둔다(넓으면 ssh 가 거부한다)
 chmod 400 labsuser.pem
 ```
+
+**Windows (PowerShell)** — `chmod` 는 통하지 않는다. Windows OpenSSH 는 파일의 **ACL** 을 검사한다.
+
+```powershell
+$key = "D:\projects\golmok-market\PEM_KEY\labsuser.pem"
+icacls $key /inheritance:r
+icacls $key /grant:r "${env:USERNAME}:R"
+icacls $key /remove:g "NT AUTHORITY\Authenticated Users" "BUILTIN\Users"
+icacls $key
+```
+
+마지막 출력에 **본인 계정 `:(R)` 과 Administrators · SYSTEM 만** 남아야 한다.
+`Authenticated Users` 나 `Users` 가 보이면 ssh 가 계속 거부한다.
+
+> 실제로 여기서 가장 오래 막혔다. 이 파일의 권한은 상위 폴더에서 **상속된 것이 아니라 파일에 직접 박혀 있어서**
+> `/inheritance:r` 만으로는 지워지지 않았다(`icacls` 출력에 `(I)` 표시가 없으면 직접 설정된 권한이다).
+> 그래서 `/remove:g` 로 해당 그룹을 명시적으로 지워야 했다. `/inheritance:r` 뒤에는 **반드시 `/grant:r` 로
+> 본인 읽기 권한을 다시 주어야 한다.** 빠뜨리면 본인도 키를 읽지 못한다.
 
 ---
 
@@ -206,7 +229,7 @@ systemctl status duckdns-update.timer --no-pager
 
 | 증상 | 원인 · 조치 |
 |---|---|
-| SSH 가 `Permission denied (publickey)` | 키 권한(`chmod 400 labsuser.pem`), 사용자 이름은 Ubuntu 이미지에서 `ubuntu` |
+| SSH 가 `Permission denied (publickey)` · `UNPROTECTED PRIVATE KEY FILE!` | 키 권한. **Windows 는 `chmod` 가 아니라 `icacls`**(1단계 참고). 사용자 이름은 Ubuntu 이미지에서 `ubuntu` |
 | SSH 가 응답 없음 | 보안 그룹 22번 Source 가 **My IP** 인데 내 IP 가 바뀐 경우. 규칙을 다시 저장한다 |
 | 어제는 됐는데 도메인으로 접속이 안 됨 | 인스턴스를 켰는지, 타이머가 도는지 확인: `systemctl status duckdns-update.timer`, `./duckdns-update.sh` 수동 실행 |
 | 인증서 발급 실패 | DuckDNS 가 새 IP 를 가리키는지 먼저 확인(`dig +short <도메인>`). 80 포트가 열려 있어야 한다. `docker compose logs caddy` |
