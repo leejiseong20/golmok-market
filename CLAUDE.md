@@ -88,7 +88,9 @@
 - [완료] **실제 배포(2026-09-18).** AWS Academy Learner Lab 의 EC2(Ubuntu 24.04 · t3.small · us-east-1)에 Docker Compose 로 MySQL·백엔드·Caddy 를 띄우고, DuckDNS 도메인에 Let's Encrypt HTTPS 를 붙였다. 프론트는 Vercel(https://golmok-market-frontend.vercel.app), API 는 `vercel.json` rewrites 로 백엔드(golmok-api.duckdns.org)에 전달한다.
 - [검증] 2026-09-18 외부 인터넷에서 확인: 백엔드 `/api/categories` 200(응답 0.8초)·인증서 검증 통과, Vercel 홈 200·`/api` 프록시 200, 브라우저(비로그인)로 동네 선택 → 상품 20개 목록·사진·상태 뱃지 표시. CORS 는 Vercel Origin 으로 `Access-Control-Allow-Origin` 응답 확인. **사용자가 로그인·채팅·휴대폰 접속까지 확인해 "기능이 모두 작동"이라고 확인했다.** 실제로 해보며 문서와 달랐던 두 가지(서울 리전 AMI 오류 → us-east-1, Windows 는 `chmod` 가 아니라 `icacls` 로 키 권한 조정)를 `deploy/README-learner-lab.md` 에 반영했다.
 - [완료] 상품 쓰기 검증 문구를 사람이 읽을 수 있게 바꿨다(2026-09-20). `ProductWriteRequest` 의 모든 제약에 한국어 메시지를 붙였다.
-- [검증] 2026-09-20 테스트 415개 → 416개(설명 길이 오류 문구), 전체 통과.
+- [검증] 2026-09-20 테스트 415개 → 416개(설명 길이 오류 문구), 전체 통과. 운영 서버에 배포한 뒤 실제 응답이 "설명은 10자 이상 입력해 주세요." 로 바뀐 것을 확인했고, 사용자도 기기에서 확인했다.
+- [완료] 나머지 요청 DTO·컨트롤러 파라미터의 검증 문구를 훑었다(2026-09-20). 기본 문구가 남아 있던 세 곳(`ProductStatusRequest` 의 상태, `ProductController` 의 상품 ID 네 곳, `AuthController` 의 이메일·닉네임 중복 확인)에 한국어 문구를 붙였다. 가입·프로필·후기·채팅·동네 인증 DTO 는 이미 모두 붙어 있었다.
+- [검증] 2026-09-20 테스트 416개 → 417개(상태 누락 문구), 전체 통과. 검증 제약에 `message` 가 없는 곳은 이제 0 이다(`grep` 로 확인).
 - [다음] 미정. 상시 주소가 필요하면 Oracle Cloud 로 이전(`deploy/README.md`), 그다음 후보는 PWA
 
 ## 알려진 과제

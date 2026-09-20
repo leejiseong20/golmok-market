@@ -55,12 +55,12 @@ public class AuthController {
     }
 
     @GetMapping("/check-email")
-    public AvailabilityResponse checkEmail(@RequestParam @NotBlank String email) {
+    public AvailabilityResponse checkEmail(@RequestParam @NotBlank(message = "이메일을 입력해 주세요.") String email) {
         return new AvailabilityResponse(authService.isEmailAvailable(email));
     }
 
     @GetMapping("/check-nickname")
-    public AvailabilityResponse checkNickname(@RequestParam @NotBlank String nickname) {
+    public AvailabilityResponse checkNickname(@RequestParam @NotBlank(message = "닉네임을 입력해 주세요.") String nickname) {
         return new AvailabilityResponse(authService.isNicknameAvailable(nickname));
     }
 }

@@ -38,7 +38,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    public ProductDetailResponse update(@PathVariable @Positive long id,
+    public ProductDetailResponse update(@PathVariable @Positive(message = "상품 ID는 양수여야 합니다.") long id,
                                         @Valid @RequestBody ProductWriteRequest request,
                                         @AuthenticationPrincipal AuthUser viewer) {
         return productService.update(id, request, viewer);
@@ -46,19 +46,19 @@ public class ProductController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable @Positive long id, @AuthenticationPrincipal AuthUser viewer) {
+    public void delete(@PathVariable @Positive(message = "상품 ID는 양수여야 합니다.") long id, @AuthenticationPrincipal AuthUser viewer) {
         productService.delete(id, viewer);
     }
 
     @PatchMapping("/{id}/status")
-    public ProductDetailResponse changeStatus(@PathVariable @Positive long id,
+    public ProductDetailResponse changeStatus(@PathVariable @Positive(message = "상품 ID는 양수여야 합니다.") long id,
                                               @Valid @RequestBody ProductStatusRequest request,
                                               @AuthenticationPrincipal AuthUser viewer) {
         return productService.changeStatus(id, request.status(), viewer);
     }
 
     @PostMapping("/{id}/bump")
-    public ProductBumpResponse bump(@PathVariable @Positive long id, @AuthenticationPrincipal AuthUser viewer) {
+    public ProductBumpResponse bump(@PathVariable @Positive(message = "상품 ID는 양수여야 합니다.") long id, @AuthenticationPrincipal AuthUser viewer) {
         return productService.bump(id, viewer);
     }
 

@@ -162,6 +162,16 @@ class ProductWriteApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** 상태를 빠뜨리면 기본 문구("널이어서는 안됩니다")가 아니라 사람이 읽을 문장이 나가야 한다. */
+    @Test void 상태를_빠뜨리면_사람이_읽을_문구를_준다() throws Exception {
+        long id = saved().getId();
+        mvc.perform(patch("/api/products/{id}/status", id).header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("status"))
+                .andExpect(jsonPath("$.errors[0].reason").value("변경할 상태를 선택해 주세요."));
+    }
+
     @Test void 삭제는_물리행과_사진을_남기고_조회에서는_숨긴다() throws Exception {
         long id = saved().getId();
         mvc.perform(delete("/api/products/{id}", id).header("Authorization", "Bearer " + token)).andExpect(status().isNoContent());
