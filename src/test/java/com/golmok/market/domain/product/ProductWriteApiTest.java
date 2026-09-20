@@ -118,6 +118,19 @@ class ProductWriteApiTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors", hasSize(4)));
     }
 
+    /**
+     * 검증 문구는 그대로 사용자 화면에 뜬다(프론트는 서버가 준 message 를 그대로 보여 준다).
+     * 기본 문구("크기가 10에서 2147483647 사이여야 합니다")가 새어 나가면 읽는 사람이 무엇을 고칠지 모른다.
+     */
+    @Test void 검증_문구는_사람이_읽을_수_있어야_한다() throws Exception {
+        var body = body(); body.put("description", "짧음");
+        mvc.perform(post("/api/products").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("description"))
+                .andExpect(jsonPath("$.errors[0].reason").value("설명은 10자 이상 입력해 주세요."));
+    }
+
     @Test void 수정은_인증동네와_이미지를_교체하고_카운터를_보존한다() throws Exception {
         Product p = saved();
         Region another = regions.save(Region.create("서울", "마포", "서교동", 37.5, 126.9));
