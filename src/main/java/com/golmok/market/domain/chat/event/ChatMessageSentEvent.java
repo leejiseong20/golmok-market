@@ -9,6 +9,7 @@ import java.util.List;
  * 커밋 뒤에는 영속성 컨텍스트가 닫혀 지연 로딩을 할 수 없기 때문이다.
  *
  * @param participantIds 받을 사람. 보낸 사람도 포함한다(같은 계정의 다른 탭·기기를 맞추기 위해).
+ * @param senderNickname 푸시 알림 제목. 커밋 뒤에는 지연 로딩을 할 수 없어 트랜잭션 안에서 담는다.
  */
-public record ChatMessageSentEvent(List<Long> participantIds, ChatMessageResponse message) {
+public record ChatMessageSentEvent(List<Long> participantIds, ChatMessageResponse message, String senderNickname) {
 }

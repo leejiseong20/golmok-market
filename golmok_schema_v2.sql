@@ -373,6 +373,25 @@ CREATE TABLE blocks (
 ) ENGINE=InnoDB COMMENT='사용자 차단';
 
 -- ============================================================
+-- 17. 웹 푸시 구독
+-- ============================================================
+
+-- 한 사람이 폰·PC 등 여러 기기에서 받을 수 있어 사용자당 여러 행이다.
+-- 푸시 서비스가 404·410(구독 만료)을 돌려주면 그 행을 지운다.
+CREATE TABLE push_subscriptions (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT       NOT NULL,
+    endpoint   VARCHAR(500) NOT NULL COMMENT '푸시 서비스가 기기마다 발급한 주소',
+    p256dh     VARCHAR(100) NOT NULL COMMENT '브라우저 P-256 공개키(base64url). 본문 암호화에 쓴다',
+    auth       VARCHAR(50)  NOT NULL COMMENT '브라우저 인증 비밀(base64url)',
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_push_endpoint (endpoint) COMMENT '기기 하나에 구독 하나. 다른 계정으로 다시 구독하면 주인을 바꾼다',
+    KEY idx_push_user (user_id) COMMENT '한 사람의 모든 기기로 보낼 때',
+    CONSTRAINT fk_push_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='웹 푸시 구독';
+
+-- ============================================================
 -- 초기 데이터
 -- ============================================================
 INSERT INTO categories (parent_id, name, sort_order) VALUES

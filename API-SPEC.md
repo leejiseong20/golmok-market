@@ -1187,3 +1187,40 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 "왜 안 보이지"가 된다. 채팅만 막는다.
 
 회원이 탈퇴하면 그 회원이 낀 차단 관계는 모두 지운다. 신고 기록은 남는다.
+
+---
+
+## 15. 웹 푸시
+
+앱을 닫아도 휴대폰 알림을 받는다. 서버 `.env` 에 VAPID 키가 없으면 푸시만 꺼지고(`enabled: false`) 나머지는 그대로다.
+모두 로그인이 필요하다.
+
+### GET `/api/push/public-key`
+```json
+{ "enabled": true, "publicKey": "BP4z9KsN6nGR…" }
+```
+`publicKey` 는 브라우저 `pushManager.subscribe({ applicationServerKey })` 에 넘길 VAPID 공개키(base64url)다.
+
+### POST `/api/push/subscriptions` — 이 기기 구독
+브라우저 `PushSubscription.toJSON()` 과 같은 모양이다. `204`.
+```json
+{ "endpoint": "https://fcm.googleapis.com/fcm/send/…", "keys": { "p256dh": "BCVx…", "auth": "BTBZ…" } }
+```
+- 같은 `endpoint`(같은 기기)로 다시 구독하면 새로 만들지 않고 **주인과 키를 바꾼다**(다른 계정으로 로그인한 경우).
+- `endpoint` 는 실제 푸시 서비스만 받는다: `fcm.googleapis.com`, `updates.push.services.mozilla.com`, `web.push.apple.com`, `*.notify.windows.com` (https, 기본 포트). 그 밖은 `400 INVALID_PUSH_SUBSCRIPTION` — 서버가 아무 주소로나 요청을 보내게 되는 것(SSRF)을 막는다.
+- 키 형식이 틀리면 `400 INVALID_PUSH_SUBSCRIPTION`, 서버 키가 없으면 `503 PUSH_DISABLED`.
+
+### DELETE `/api/push/subscriptions` — 이 기기 구독 해제
+본문 `{ "endpoint": "…" }`, `204`. 남의 구독이거나 없으면 아무 일도 하지 않는다(`204`).
+구독 주소는 기기 식별자라 쿼리가 아니라 본문으로 받는다(접속 로그에 남지 않게).
+
+### 무엇을 보내나
+| 계기 | 제목 · 본문 | 누르면 |
+|---|---|---|
+| 알림(찜·거래·후기·가격 인하) | 알림 제목 · 내용 | 알림의 `targetUrl` |
+| 채팅 메시지(시스템 메시지 제외) | 보낸 사람 닉네임 · 메시지(120자) | `/chat-rooms/{id}` |
+
+- **앱을 보고 있는 사람(WebSocket 연결 중)에게는 보내지 않는다.** 화면이 이미 실시간으로 바뀐다.
+- 시스템 메시지는 같은 사건의 거래 알림이 따로 푸시되므로 보내지 않는다.
+- 같은 채팅방 알림은 기기에서 하나로 겹친다(`tag`). 차단 관계면 알림이 만들어지지 않으므로 푸시도 없다.
+- 본문은 RFC 8291(aes128gcm)로 암호화하고 RFC 8292(VAPID)로 서명한다. 푸시 서비스가 `404`·`410` 을 주면 그 구독을 지운다.

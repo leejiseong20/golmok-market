@@ -66,6 +66,10 @@ public enum ErrorCode {
     // 차단한 쪽에는 ChatService 가 "해제하면 된다"는 문구로 바꿔 보낸다.
     BLOCKED_USER(HttpStatus.FORBIDDEN, "지금은 이 사용자와 대화할 수 없어요."),
 
+    // ---------- 웹 푸시 ----------
+    PUSH_DISABLED(HttpStatus.SERVICE_UNAVAILABLE, "지금은 알림을 받을 수 없어요."),
+    INVALID_PUSH_SUBSCRIPTION(HttpStatus.BAD_REQUEST, "알림 구독 정보가 올바르지 않습니다."),
+
     // ---------- 이미지 ----------
     UNSUPPORTED_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 이미지만 올릴 수 있습니다."),
     IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지는 장당 5MB 이하여야 합니다."),

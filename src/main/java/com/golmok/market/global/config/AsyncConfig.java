@@ -19,6 +19,24 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 public class AsyncConfig {
 
     public static final String SEARCH_LOG_EXECUTOR = "searchLogExecutor";
+    public static final String PUSH_EXECUTOR = "pushExecutor";
+
+    /**
+     * 웹 푸시 발송. 푸시 서비스로 HTTP 요청을 보내므로 느릴 수 있다(연결 5초·응답 10초 제한).
+     * 요청 스레드에서 보내면 채팅 전송이 그만큼 늦어진다. 넘치면 버린다 — 알림은 앱 안의 알림함·뱃지에 남는다.
+     */
+    @Bean(name = PUSH_EXECUTOR)
+    public ThreadPoolTaskExecutor pushExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("push-");
+        executor.setRejectedExecutionHandler((task, pool) -> log.warn("푸시 대기열이 가득 차 푸시 1건을 버렸다"));
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(5);
+        return executor;
+    }
 
     @Bean(name = SEARCH_LOG_EXECUTOR)
     public ThreadPoolTaskExecutor searchLogExecutor() {

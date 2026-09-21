@@ -15,6 +15,7 @@ import com.golmok.market.domain.trade.Trade;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
 import com.golmok.market.domain.notification.dto.UnreadCountResponse;
+import com.golmok.market.domain.user.User;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.global.error.BusinessException;
@@ -182,7 +183,8 @@ public class ChatService {
         chatMessageRepository.save(message);
         room.recordMessage(message);
         ChatMessageResponse response = ChatMessageResponse.from(message);
-        eventPublisher.publishEvent(new ChatMessageSentEvent(participantIds(room), response));
+        User sender = room.isBuyer(message.getSender().getId()) ? room.getBuyer() : room.getSeller();
+        eventPublisher.publishEvent(new ChatMessageSentEvent(participantIds(room), response, sender.getNickname()));
         return response;
     }
 
