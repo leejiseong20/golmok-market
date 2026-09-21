@@ -238,3 +238,18 @@ systemctl status duckdns-update.timer --no-pager
 | 랩 Reset 후 전부 사라짐 | 정상 동작이다. 2단계부터 다시 하고 백업 SQL 로 복구한다 |
 
 나머지(스키마·CORS·이미지·데모 데이터 관련)는 [README.md](README.md) 의 문제 해결 표를 본다.
+
+
+---
+
+## 웹 푸시 키(VAPID) 만들기
+
+앱을 닫아도 알림을 받으려면 서버에 VAPID 키 쌍이 있어야 한다. **서버(Ubuntu)에서** 한 번만 실행한다.
+
+```bash
+cd ~/golmok-market/deploy && bash vapid-setup.sh && docker compose up -d app
+```
+
+- 키를 서버 안에서 openssl 로 만들어 `.env` 에 넣는다. **개인키는 화면에 출력하지 않는다.** 이전 `.env` 는 `.env.bak.<시각>` 으로 남는다.
+- 이미 키가 있으면 아무것도 하지 않는다. **키를 바꾸면 모든 기기의 구독이 무효가 되어** 사용자가 알림을 다시 켜야 한다.
+- 확인: 로그인한 상태로 `GET /api/push/public-key` 가 `enabled: true` 면 된다. 키 짝이 틀리면 앱은 뜨고 푸시만 꺼진다(`enabled: false` + 오류 로그).
