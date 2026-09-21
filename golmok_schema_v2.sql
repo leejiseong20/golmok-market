@@ -111,6 +111,14 @@ CREATE TABLE categories (
 -- ============================================================
 -- 6. 상품
 -- ============================================================
+
+-- 검색용 FULLTEXT(ngram) 인덱스는 **불용어를 끈 채로** 만들어야 한다.
+-- ngram 파서는 불용어와 "같은" 조각이 아니라 불용어를 "포함한" 조각을 색인에서 뺀다.
+-- 기본 불용어 목록에 영어 한 글자 a · i 가 있어서, a 나 i 가 들어간 2글자 조각(ip, pa, ai, mi ...)이
+-- 모두 빠지고 ipad · air · mini · adidas 같은 검색이 실패한다(로컬 MySQL 8.0.44 로 확인, 2026-09-21).
+-- 이 설정은 인덱스를 만드는 순간의 값이 테이블에 저장되므로, 만든 뒤에 바꿔도 소용없다.
+SET SESSION innodb_ft_enable_stopword = OFF;
+
 CREATE TABLE products (
     id             BIGINT       NOT NULL AUTO_INCREMENT,
     seller_id      BIGINT       NOT NULL,
