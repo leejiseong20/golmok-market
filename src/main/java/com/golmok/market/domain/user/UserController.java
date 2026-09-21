@@ -41,8 +41,10 @@ public class UserController {
     private final WithdrawalService withdrawalService;
 
     @GetMapping("/{id}")
-    public UserProfileResponse findProfile(@PathVariable @Positive(message = "사용자 ID는 양수여야 합니다.") long id) {
-        return userService.findProfile(id);
+    public UserProfileResponse findProfile(@PathVariable @Positive(message = "사용자 ID는 양수여야 합니다.") long id,
+                                           @AuthenticationPrincipal AuthUser viewer) {
+        // 공개 API 라 비로그인이면 viewer 가 null 이다.
+        return userService.findProfile(id, viewer);
     }
 
     @GetMapping("/me")

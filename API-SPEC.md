@@ -1099,3 +1099,84 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 { "type": "NOTIFICATION", "notification": { "id": 31, "type": "TRADE", "title": "...", "content": "...", "targetUrl": "/chat-rooms/7", "read": false, "createdAt": "..." } }
 ```
 - 알림 트랜잭션이 커밋된 뒤에 보낸다. 끊긴 동안의 알림은 다시 오지 않으므로 **재연결 시 `unread-count`를 다시 불러온다.**
+
+---
+
+## 14. 신고 · 차단
+
+신고는 **접수만 한다.** 신고 수로 상품을 자동으로 숨기지 않는다. 경쟁 판매자가 몰아서 신고하면
+멀쩡한 상품이 내려가기 때문이다. 관리자 화면은 아직 없고 `reports` 표를 직접 본다.
+신고당한 사람·차단당한 사람에게는 **아무 것도 알리지 않는다.**
+
+### POST `/api/reports` — 신고
+
+요청
+```json
+{ "targetType": "PRODUCT", "targetId": 12, "reason": "FRAUD", "detail": "선입금을 요구해요" }
+```
+| 필드 | 값 |
+|---|---|
+| `targetType` | `USER` · `PRODUCT` |
+| `reason` | `SPAM`(광고·도배) · `FRAUD`(사기 의심) · `PROHIBITED`(거래 금지 물품) · `ABUSE`(욕설·비방) · `OTHER`(기타) |
+| `detail` | 최대 500자. `OTHER` 면 **필수**. 공백만 적은 것은 안 적은 것으로 본다 |
+
+응답 `201`
+```json
+{ "id": 3, "targetType": "PRODUCT", "targetId": 12, "reason": "FRAUD", "createdAt": "2026-09-20T14:02:11" }
+```
+
+| 상황 | 응답 |
+|---|---|
+| 같은 대상을 다시 신고 | `409 ALREADY_REPORTED` |
+| 자기 자신 · 자기 상품 | `400 CANNOT_REPORT_SELF` |
+| `OTHER` 인데 내용 없음 | `400 REPORT_DETAIL_REQUIRED` |
+| 없는 상품 · 삭제된 상품 | `404 PRODUCT_NOT_FOUND` |
+| 없는 회원 · 탈퇴한 회원 | `404 USER_NOT_FOUND` |
+
+대상 종류가 다르면 별개다. 같은 사람의 상품과 사람 자체를 각각 신고할 수 있다.
+
+### POST `/api/users/{id}/block` — 차단
+
+`201`(본문 없음).
+
+| 상황 | 응답 |
+|---|---|
+| 이미 차단한 사람 | `409 ALREADY_BLOCKED` |
+| 자기 자신 | `400 CANNOT_BLOCK_SELF` |
+| 없는 회원 · 탈퇴한 회원 | `404 USER_NOT_FOUND` |
+
+### DELETE `/api/users/{id}/block` — 차단 해제
+
+`204`. 차단하지 않은 사람을 해제해도 `204`다(멱등).
+
+### GET `/api/users/me/blocks` — 차단 목록
+
+최근에 차단한 순. 커서 페이징(`cursor`, `size`)은 다른 목록과 같다.
+```json
+{ "content": [ { "userId": 8, "nickname": "이웃", "profileImageUrl": null, "blockedAt": "2026-09-20T14:02:11" } ],
+  "nextCursor": null, "hasNext": false }
+```
+
+### 프로필의 `blockedByMe`
+
+`GET /api/users/{id}` 응답에 `blockedByMe`(boolean)가 추가됐다. 내가 이 회원을 차단했는지다.
+화면이 "차단하기"와 "차단 해제" 중 무엇을 보일지 정한다. 비로그인이면 항상 `false`.
+**상대가 나를 차단했는지는 알려주지 않는다**(차단당한 사실은 드러나지 않아야 한다).
+
+### 차단하면 달라지는 것
+
+| | 동작 | 방향 |
+|---|---|---|
+| 상품 목록·검색 | 그 사람 상품이 빠진다 | 차단한 쪽 화면에서만 |
+| 상품 상세 | **그대로 보인다** | — |
+| 채팅방 열기 · 메시지 전송 | `403 BLOCKED_USER` | 양방향 |
+| 채팅 목록 · 안 읽은 뱃지 | 그 방이 빠진다(방과 대화는 남는다) | 양방향 |
+| 알림 | 그 사람이 일으킨 알림이 오지 않는다 | 양방향 |
+
+`BLOCKED_USER` 의 문구는 **누가 묻느냐에 따라 다르다.** 차단한 쪽에는 "차단한 사용자예요. 차단을 해제하면 다시 대화할 수 있어요.",
+차단당한 쪽에는 "지금은 이 사용자와 대화할 수 없어요." — 이유를 밝히지 않는다("차단"이라는 말이 보이면 차단당한 사실이 드러난다).
+
+상세를 감추지 않는 이유: 차단은 숨김이 아니라 관계를 끊는 일이다. 주소로 들어온 상품이 404 가 되면
+"왜 안 보이지"가 된다. 채팅만 막는다.
+
+회원이 탈퇴하면 그 회원이 낀 차단 관계는 모두 지운다. 신고 기록은 남는다.

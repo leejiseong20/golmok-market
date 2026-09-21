@@ -88,7 +88,7 @@ public class ChatTradeService {
     private void notifyOpponent(Locked locked, AuthUser viewer, String title) {
         eventPublisher.publishEvent(new NotificationRequestedEvent(locked.room().getOpponentId(viewer.id()),
                 NotificationType.TRADE, title, locked.product().getTitle(),
-                NotificationRequestedEvent.chatRoomUrl(locked.room().getId())));
+                NotificationRequestedEvent.chatRoomUrl(locked.room().getId()), viewer.id()));
     }
 
     /** 상품 → 방 순서로 잠근다. 나가지 않은 참여자가 아니면 방이 없는 것처럼 404. */

@@ -1,5 +1,6 @@
 package com.golmok.market.domain.user;
 
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.image.ImageUrlValidator;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.trade.ReviewRepository;
@@ -26,15 +27,17 @@ public class UserService {
     private final UserRegionService userRegionService;
     private final ProductRepository productRepository;
     private final ReviewRepository reviewRepository;
+    private final BlockRepository blockRepository;
     private final ImageUrlValidator imageUrlValidator;
 
     /** 탈퇴한 회원의 공개 프로필은 없는 사용자로 본다(익명화된 행만 남아 있다). */
-    public UserProfileResponse findProfile(long id) {
+    public UserProfileResponse findProfile(long id, AuthUser viewer) {
         User user = userRepository.findById(id)
                 .filter(found -> !found.isWithdrawn())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         return new UserProfileResponse(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getMannerTemp(),
-                productRepository.countBySellerIdAndDeletedAtIsNull(id), reviewRepository.countByRevieweeId(id));
+                productRepository.countBySellerIdAndDeletedAtIsNull(id), reviewRepository.countByRevieweeId(id),
+                viewer != null && blockRepository.existsByBlockerIdAndBlockedId(viewer.id(), id));
     }
 
     /**

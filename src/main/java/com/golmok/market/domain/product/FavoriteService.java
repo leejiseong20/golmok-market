@@ -60,7 +60,7 @@ public class FavoriteService {
         }
         // 누가 찜했는지는 알리지 않는다. 같은 상품의 안 읽은 찜 알림은 하나로 합쳐지므로 닉네임을 넣으면 틀린 정보가 된다.
         eventPublisher.publishEvent(new NotificationRequestedEvent(product.getSeller().getId(), NotificationType.FAVORITE,
-                "누군가 내 상품을 찜했어요", product.getTitle(), NotificationRequestedEvent.productUrl(productId)));
+                "누군가 내 상품을 찜했어요", product.getTitle(), NotificationRequestedEvent.productUrl(productId), viewer.id()));
         productRepository.incrementFavoriteCount(productId);
         return new FavoriteResponse(true, productRepository.findFavoriteCount(productId));
     }

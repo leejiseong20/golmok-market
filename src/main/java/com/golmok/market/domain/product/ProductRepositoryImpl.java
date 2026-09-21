@@ -1,5 +1,6 @@
 package com.golmok.market.domain.product;
 
+import com.golmok.market.domain.block.Block;
 import com.golmok.market.global.pagination.Cursor;
 import com.golmok.market.global.pagination.PageSize;
 import jakarta.persistence.EntityManager;
@@ -8,6 +9,7 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDateTime;
@@ -43,7 +45,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     }
 
     @Override
-    public List<Product> findPage(long regionId, Long categoryId, String keyword, ProductSort sort, Cursor cursor, PageSize pageSize) {
+    public List<Product> findPage(long regionId, Long categoryId, String keyword, ProductSort sort,
+                                  Cursor cursor, PageSize pageSize, Long viewerId) {
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<Product> query = cb.createQuery(Product.class);
         Root<Product> product = query.from(Product.class);
@@ -56,6 +59,19 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         conditions.add(cb.equal(product.get("region").get("id"), regionId));
         if (categoryId != null) {
             conditions.add(cb.equal(product.get("category").get("id"), categoryId));
+        }
+        /*
+         * 차단한 판매자의 상품을 뺀다.
+         * 차단 id 를 먼저 조회해 IN 으로 거르지 않는 이유: 목록 조회 쿼리가 한 번 늘고,
+         * 차단이 많은 계정에서는 IN 목록이 그만큼 커진다. 상관 서브쿼리면 둘 다 없다.
+         */
+        if (viewerId != null) {
+            Subquery<Integer> blocked = query.subquery(Integer.class);
+            Root<Block> block = blocked.from(Block.class);
+            blocked.select(cb.literal(1)).where(
+                    cb.equal(block.get("blocker").get("id"), viewerId),
+                    cb.equal(block.get("blocked").get("id"), product.get("seller").get("id")));
+            conditions.add(cb.not(cb.exists(blocked)));
         }
         if (keyword != null && !keyword.isBlank()) {
             String pattern = "%" + keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";

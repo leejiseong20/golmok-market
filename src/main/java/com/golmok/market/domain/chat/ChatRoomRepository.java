@@ -60,9 +60,10 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             where r.lastMessageAt is not null
               and ((r.buyer.id = :userId and r.buyerLeft = false)
                 or (r.seller.id = :userId and r.sellerLeft = false))
+              and r.buyer.id not in :excludedIds and r.seller.id not in :excludedIds
             order by r.lastMessageAt desc, r.id desc
             """)
-    List<ChatRoom> findMyRooms(long userId, Pageable pageable);
+    List<ChatRoom> findMyRooms(long userId, List<Long> excludedIds, Pageable pageable);
 
     @Query("""
             select r from ChatRoom r
@@ -72,10 +73,12 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             where r.lastMessageAt is not null
               and ((r.buyer.id = :userId and r.buyerLeft = false)
                 or (r.seller.id = :userId and r.sellerLeft = false))
+              and r.buyer.id not in :excludedIds and r.seller.id not in :excludedIds
               and (r.lastMessageAt < :cursorTime or (r.lastMessageAt = :cursorTime and r.id < :cursorId))
             order by r.lastMessageAt desc, r.id desc
             """)
-    List<ChatRoom> findMyRoomsAfter(long userId, LocalDateTime cursorTime, long cursorId, Pageable pageable);
+    List<ChatRoom> findMyRoomsAfter(long userId, List<Long> excludedIds,
+                                    LocalDateTime cursorTime, long cursorId, Pageable pageable);
 
     /** 회원 탈퇴: 그 회원이 낀 모든 방에서 "나감"으로 표시한다. 대화 내용은 남는다(상대에게는 상대가 나간 방으로 보인다). */
     @Modifying(flushAutomatically = true)

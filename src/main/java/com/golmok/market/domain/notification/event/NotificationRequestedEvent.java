@@ -9,7 +9,13 @@ import com.golmok.market.domain.notification.NotificationType;
  * 그때는 원래 트랜잭션의 영속성 컨텍스트가 닫혀 상품 제목·닉네임을 지연 로딩할 수 없다.
  */
 public record NotificationRequestedEvent(long recipientId, NotificationType type,
-                                         String title, String content, String targetUrl) {
+                                         String title, String content, String targetUrl, Long actorId) {
+
+    /** 행위자가 없는 알림(가격 하락처럼 사람이 아니라 사건이 일으킨 것). */
+    public NotificationRequestedEvent(long recipientId, NotificationType type,
+                                      String title, String content, String targetUrl) {
+        this(recipientId, type, title, content, targetUrl, null);
+    }
 
     public static String productUrl(long productId) {
         return "/products/" + productId;

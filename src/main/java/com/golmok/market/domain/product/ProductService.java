@@ -175,7 +175,9 @@ public class ProductService {
         if (cursor == null && loggedKeyword != null) {
             eventPublisher.publishEvent(new ProductSearchedEvent(viewer == null ? null : viewer.id(), regionId, loggedKeyword));
         }
-        List<Product> fetched = productRepository.findPage(regionId, categoryId, normalizedKeyword, order, cursor, pageSize);
+        // 차단한 사람의 상품은 목록에서 뺀다(리포지터리의 서브쿼리). 비로그인에게는 차단이 없다.
+        List<Product> fetched = productRepository.findPage(regionId, categoryId, normalizedKeyword, order, cursor, pageSize,
+                viewer == null ? null : viewer.id());
         CursorResponse<Product> page = CursorResponse.of(fetched, pageSize, order::cursorOf);
         List<Long> ids = page.content().stream().map(Product::getId).toList();
         // 페이징을 마친 상품에 대해서만 이미지·찜을 일괄 조회한다. 컬렉션 지연 로딩을 유발하지 않는다.

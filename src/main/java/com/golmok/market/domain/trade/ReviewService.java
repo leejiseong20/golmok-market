@@ -63,7 +63,7 @@ public class ReviewService {
         userRepository.adjustMannerTemp(review.getReviewee().getId(), review.toMannerDelta());
         eventPublisher.publishEvent(new NotificationRequestedEvent(review.getReviewee().getId(), NotificationType.TRADE,
                 "새 후기를 받았어요", "%s님 · %d점".formatted(reviewer.getNickname(), review.getScore()),
-                NotificationRequestedEvent.MY_REVIEWS_URL));
+                NotificationRequestedEvent.MY_REVIEWS_URL, reviewer.getId()));
         return response;
     }
 

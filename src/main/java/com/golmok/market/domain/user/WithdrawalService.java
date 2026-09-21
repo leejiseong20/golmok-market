@@ -6,6 +6,7 @@ import com.golmok.market.domain.product.FavoriteRepository;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.security.AuthUser;
@@ -45,6 +46,7 @@ public class WithdrawalService {
     private final TradeRepository tradeRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final NotificationRepository notificationRepository;
+    private final BlockRepository blockRepository;
     private final UserRegionRepository userRegionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -72,6 +74,8 @@ public class WithdrawalService {
         chatRoomRepository.leaveAllAsBuyer(user.getId());
         chatRoomRepository.leaveAllAsSeller(user.getId());
         notificationRepository.deleteAllByUserId(user.getId());
+        // 차단 관계는 남겨도 쓸 곳이 없다. 익명화된 행만 가리키고, 그 사람과 다시 마주칠 일도 없다.
+        blockRepository.deleteAllRelatedTo(user.getId());
         userRegionRepository.deleteAllByUserId(user.getId());
         refreshTokenRepository.deleteAllByUserId(user.getId());
         user.withdraw(now);

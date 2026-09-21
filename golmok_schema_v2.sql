@@ -330,6 +330,41 @@ CREATE TABLE search_logs (
 --  LIMIT 5;
 
 -- ============================================================
+-- 16. 신고 · 차단
+-- ============================================================
+
+-- 대상(target_type + target_id)에는 FK 를 걸지 않는다.
+-- 한 컬럼이 users 와 products 를 동시에 가리킬 수 없기 때문이다. 대상이 실제로 있는지는 서비스가 확인한다.
+-- 대상별로 테이블을 나누면 FK 는 지키지만, 신고 대상이 늘 때마다 테이블이 복제된다.
+CREATE TABLE reports (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    reporter_id BIGINT       NOT NULL,
+    target_type VARCHAR(20)  NOT NULL COMMENT 'USER | PRODUCT',
+    target_id   BIGINT       NOT NULL,
+    reason      VARCHAR(30)  NOT NULL COMMENT 'SPAM | FRAUD | PROHIBITED | ABUSE | OTHER',
+    detail      VARCHAR(500) NULL COMMENT '신고자가 적은 설명. 사유가 OTHER 면 필수',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_report (reporter_id, target_type, target_id) COMMENT '같은 대상 중복 신고 방지',
+    KEY idx_reports_target (target_type, target_id) COMMENT '대상별 신고 조회용',
+    CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='신고';
+
+-- 차단은 한 방향이다. 내가 차단해도 상대의 blocks 행은 생기지 않는다.
+-- "차단했는가"를 볼 때는 양쪽을 모두 본다(내가 차단했거나 상대가 나를 차단했거나).
+CREATE TABLE blocks (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    blocker_id BIGINT   NOT NULL COMMENT '차단한 사람',
+    blocked_id BIGINT   NOT NULL COMMENT '차단당한 사람',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_block (blocker_id, blocked_id),
+    KEY idx_blocks_blocked (blocked_id) COMMENT '나를 차단한 사람 조회용',
+    CONSTRAINT fk_blocks_blocker FOREIGN KEY (blocker_id) REFERENCES users(id),
+    CONSTRAINT fk_blocks_blocked FOREIGN KEY (blocked_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='사용자 차단';
+
+-- ============================================================
 -- 초기 데이터
 -- ============================================================
 INSERT INTO categories (parent_id, name, sort_order) VALUES

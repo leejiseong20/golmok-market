@@ -37,6 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import com.golmok.market.domain.block.Block;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,6 +71,7 @@ class NotificationFlowTest {
     @Autowired CategoryRepository categoryRepository;
     @Autowired RegionRepository regionRepository;
     @Autowired FavoriteRepository favoriteRepository;
+    @Autowired com.golmok.market.domain.block.BlockRepository blockRepository;
     @Autowired FavoriteService favoriteService;
     @Autowired ImageService imageService;
     @Autowired ImageProperties imageProperties;
@@ -154,6 +156,22 @@ class NotificationFlowTest {
                 "판매자가 예약을 취소했어요", "원목 식탁", "/chat-rooms/1"));
 
         notifications(otherToken).andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    /**
+     * 차단은 "이 사람에게서 아무것도 받지 않겠다"는 뜻이다. 알림도 오면 안 된다.
+     * 어느 쪽이 차단했든 같다. 여기서는 받는 사람이 차단한 경우를 본다.
+     */
+    @Test
+    void 차단한_사람이_일으킨_알림은_만들지_않는다() throws Exception {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                blockRepository.save(Block.of(
+                        userRepository.getReferenceById(seller.getId()),
+                        userRepository.getReferenceById(buyer.getId()))));
+
+        mockMvc.perform(auth(post("/api/products/{id}/favorite", product.getId()), buyerToken)).andExpect(status().isOk());
+
+        notifications(sellerToken).andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     // ---------- 찜 ----------

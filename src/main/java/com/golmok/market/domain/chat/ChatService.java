@@ -16,6 +16,7 @@ import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
 import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.user.UserRepository;
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.pagination.Cursor;
@@ -29,6 +30,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,6 +53,7 @@ public class ChatService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final ProductThumbnails productThumbnails;
+    private final BlockRepository blockRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final TradeRepository tradeRepository;
     private final ReviewService reviewService;
@@ -75,6 +78,7 @@ public class ChatService {
         if (product.isOwnedBy(viewer.id())) {
             throw new BusinessException(ErrorCode.CANNOT_CHAT_OWN_PRODUCT);
         }
+        ensureNotBlocked(viewer.id(), product.getSeller().getId());
 
         Optional<ChatRoom> existing = chatRoomRepository.findByProductIdAndBuyerIdForUpdate(productId, viewer.id());
         if (existing.isPresent()) {
@@ -99,9 +103,10 @@ public class ChatService {
         PageSize pageSize = PageSize.of(size);
         Pageable limit = PageRequest.of(0, pageSize.fetchSize());
 
+        List<Long> excluded = blockedPartnerIds(viewer.id());
         List<ChatRoom> fetched = cursor == null
-                ? chatRoomRepository.findMyRooms(viewer.id(), limit)
-                : chatRoomRepository.findMyRoomsAfter(viewer.id(), cursor.valueAsDateTime(), cursor.id(), limit);
+                ? chatRoomRepository.findMyRooms(viewer.id(), excluded, limit)
+                : chatRoomRepository.findMyRoomsAfter(viewer.id(), excluded, cursor.valueAsDateTime(), cursor.id(), limit);
 
         CursorResponse<ChatRoom> page = CursorResponse.of(fetched, pageSize,
                 room -> Cursor.of(room.getLastMessageAt(), room.getId()));
@@ -160,6 +165,7 @@ public class ChatService {
         if (room.getOpponent(viewer.id()).isWithdrawn()) {
             throw new BusinessException(ErrorCode.CHAT_OPPONENT_WITHDRAWN);
         }
+        ensureNotBlocked(viewer.id(), room.getOpponentId(viewer.id()));
         return post(room, ChatMessage.text(room, userRepository.getReferenceById(viewer.id()), request.content()));
     }
 
@@ -208,7 +214,36 @@ public class ChatService {
 
     /** 헤더·하단 탭의 채팅 뱃지. 내가 나가지 않은 방에서 상대가 보낸 안 읽은 메시지 합계. */
     public UnreadCountResponse countUnread(AuthUser viewer) {
-        return new UnreadCountResponse(chatMessageRepository.countAllUnread(viewer.id()));
+        // 목록에서 숨긴 방의 안 읽은 수가 뱃지에만 남으면, 눌러도 아무것도 없는 숫자가 된다.
+        return new UnreadCountResponse(chatMessageRepository.countAllUnread(viewer.id(), blockedPartnerIds(viewer.id())));
+    }
+
+    /**
+     * 어느 쪽이 차단했든 대화를 막는다. 차단당한 사람이 계속 말을 걸 수 있으면 차단이 아니다.
+     *
+     * 문구는 누가 묻느냐에 따라 다르다. 내가 차단했으면 해제하면 된다고 알려 준다.
+     * 상대가 나를 차단했으면 이유를 밝히지 않는다 — "차단" 이라는 말이 보이면 차단당한 사실이 드러난다.
+     * 그래서 existsBetween 한 번이 아니라 방향별로 두 번 본다.
+     */
+    private void ensureNotBlocked(long viewerId, long opponentId) {
+        if (blockRepository.existsByBlockerIdAndBlockedId(viewerId, opponentId)) {
+            throw new BusinessException(ErrorCode.BLOCKED_USER, "차단한 사용자예요. 차단을 해제하면 다시 대화할 수 있어요.");
+        }
+        if (blockRepository.existsByBlockerIdAndBlockedId(opponentId, viewerId)) {
+            throw new BusinessException(ErrorCode.BLOCKED_USER);
+        }
+    }
+
+    /**
+     * 차단 관계인 상대(양쪽 모두). 그 사람과의 방은 목록과 뱃지에서 뺀다.
+     * 방과 대화는 지우지 않는다 — 신고의 근거가 될 수 있고, 차단을 풀면 그대로 다시 보여야 한다.
+     *
+     * 비어 있어도 실제로 존재할 수 없는 id(-1)를 하나 넣어 돌려준다. 빈 IN 절 쿼리를 보내지 않기 위해서다.
+     */
+    private List<Long> blockedPartnerIds(long viewerId) {
+        List<Long> ids = new ArrayList<>(blockRepository.findRelatedIds(viewerId));
+        ids.add(-1L);
+        return ids;
     }
 
     private ChatRoom requireActiveRoom(long roomId, AuthUser viewer) {

@@ -54,6 +54,18 @@ public enum ErrorCode {
     CANNOT_FAVORITE_OWN_PRODUCT(HttpStatus.BAD_REQUEST, "자신의 상품은 찜할 수 없습니다."),
     ALREADY_FAVORITED(HttpStatus.CONFLICT, "이미 찜한 상품입니다."),
 
+    // ---------- 신고 ----------
+    CANNOT_REPORT_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 신고할 수 없습니다."),
+    ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 대상입니다."),
+    REPORT_DETAIL_REQUIRED(HttpStatus.BAD_REQUEST, "기타를 고르면 어떤 점이 문제인지 적어 주세요."),
+
+    // ---------- 차단 ----------
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),
+    ALREADY_BLOCKED(HttpStatus.CONFLICT, "이미 차단한 사용자입니다."),
+    // 기본 문구는 차단당한 쪽이 보는 것이다. 이유를 밝히지 않는다(차단당한 사실이 드러나면 안 된다).
+    // 차단한 쪽에는 ChatService 가 "해제하면 된다"는 문구로 바꿔 보낸다.
+    BLOCKED_USER(HttpStatus.FORBIDDEN, "지금은 이 사용자와 대화할 수 없어요."),
+
     // ---------- 이미지 ----------
     UNSUPPORTED_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 이미지만 올릴 수 있습니다."),
     IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지는 장당 5MB 이하여야 합니다."),

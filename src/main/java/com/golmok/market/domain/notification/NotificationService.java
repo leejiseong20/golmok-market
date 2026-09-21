@@ -3,6 +3,7 @@ package com.golmok.market.domain.notification;
 import com.golmok.market.domain.notification.dto.NotificationResponse;
 import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.notification.event.NotificationCreatedEvent;
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.notification.event.NotificationRequestedEvent;
 import com.golmok.market.domain.product.FavoriteRepository;
 import com.golmok.market.domain.product.event.ProductPriceDroppedEvent;
@@ -38,6 +39,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final FavoriteRepository favoriteRepository;
     private final UserRepository userRepository;
+    private final BlockRepository blockRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -61,6 +63,10 @@ public class NotificationService {
     }
 
     private void save(NotificationRequestedEvent request) {
+        // 차단 관계면 보내지 않는다(어느 쪽이 차단했든). 차단은 "이 사람에게서 아무것도 받지 않겠다"는 뜻이다.
+        if (request.actorId() != null && blockRepository.existsBetween(request.recipientId(), request.actorId())) {
+            return;
+        }
         // 탈퇴한 회원에게는 쌓지 않는다(탈퇴 때 알림함을 비웠고 다시 볼 사람이 없다). 없는 회원도 같이 거른다.
         if (userRepository.findById(request.recipientId()).filter(user -> !user.isWithdrawn()).isEmpty()) {
             return;

@@ -42,8 +42,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             where m.sender.id <> :userId and m.read = false
               and ((r.buyer.id = :userId and r.buyerLeft = false)
                 or (r.seller.id = :userId and r.sellerLeft = false))
+              and r.buyer.id not in :excludedIds and r.seller.id not in :excludedIds
             """)
-    long countAllUnread(long userId);
+    long countAllUnread(long userId, List<Long> excludedIds);
 
     /** 상대가 보낸 안 읽은 메시지를 한 번에 읽음 처리한다. 메시지를 하나씩 읽어 들이지 않는다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
