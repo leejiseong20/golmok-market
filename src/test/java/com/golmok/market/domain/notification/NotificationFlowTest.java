@@ -35,9 +35,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.golmok.market.domain.block.Block;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import com.golmok.market.domain.block.Block;
 import java.util.List;
 import java.util.UUID;
 
@@ -175,6 +175,23 @@ class NotificationFlowTest {
     }
 
     // ---------- 찜 ----------
+
+    @Test
+    void 가격_인하도_양방향_차단을_적용하고_차단하지_않은_사람에게만_알린다() throws Exception {
+        mockMvc.perform(auth(post("/api/products/{id}/favorite", product.getId()), buyerToken)).andExpect(status().isOk());
+        mockMvc.perform(auth(post("/api/products/{id}/favorite", product.getId()), otherToken)).andExpect(status().isOk());
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                blockRepository.save(Block.of(userRepository.getReferenceById(buyer.getId()),
+                        userRepository.getReferenceById(seller.getId()))));
+        updatePrice(70000);
+        notifications(buyerToken).andExpect(jsonPath("$.content", hasSize(0)));
+        notifications(otherToken).andExpect(jsonPath("$.content", hasSize(1)));
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+                blockRepository.save(Block.of(userRepository.getReferenceById(seller.getId()),
+                        userRepository.getReferenceById(other.getId()))));
+        updatePrice(60000);
+        notifications(otherToken).andExpect(jsonPath("$.content", hasSize(1)));
+    }
 
     @Test
     void 찜하면_판매자에게_알림이_가고_안_읽은_찜_알림은_하나로_합친다() throws Exception {

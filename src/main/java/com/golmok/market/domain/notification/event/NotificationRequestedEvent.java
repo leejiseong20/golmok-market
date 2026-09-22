@@ -11,7 +11,7 @@ import com.golmok.market.domain.notification.NotificationType;
 public record NotificationRequestedEvent(long recipientId, NotificationType type,
                                          String title, String content, String targetUrl, Long actorId) {
 
-    /** 행위자가 없는 알림(가격 하락처럼 사람이 아니라 사건이 일으킨 것). */
+    /** 행위자가 없는 시스템 알림. 가격 인하 등 회원의 행동에는 actorId 를 반드시 담는다. */
     public NotificationRequestedEvent(long recipientId, NotificationType type,
                                       String title, String content, String targetUrl) {
         this(recipientId, type, title, content, targetUrl, null);

@@ -1,11 +1,13 @@
 package com.golmok.market.domain.chat;
 
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.chat.dto.ChatMessageResponse;
 import com.golmok.market.domain.chat.dto.ChatMessageSendRequest;
 import com.golmok.market.domain.chat.dto.ChatRoomResponse;
 import com.golmok.market.domain.chat.dto.ChatRoomSummaryResponse;
 import com.golmok.market.domain.chat.event.ChatMessageSentEvent;
 import com.golmok.market.domain.chat.event.ChatMessagesReadEvent;
+import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.product.Product;
 import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.product.ProductStatus;
@@ -14,10 +16,8 @@ import com.golmok.market.domain.trade.ReviewService;
 import com.golmok.market.domain.trade.Trade;
 import com.golmok.market.domain.trade.TradeRepository;
 import com.golmok.market.domain.trade.TradeStatus;
-import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.user.User;
 import com.golmok.market.domain.user.UserRepository;
-import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.pagination.Cursor;
@@ -265,6 +265,7 @@ public class ChatService {
         Trade trade = tradeRepository.findFirstByChatRoomIdAndStatusNotInOrderByIdDesc(
                 room.getId(), List.of(TradeStatus.CANCELED, TradeStatus.REFUNDED)).orElse(null);
         return ChatRoomResponse.of(room, viewer.id(), productThumbnails.of(List.of(productId)).get(productId), trade,
-                reviewService.canReview(trade, viewer.id()));
+                reviewService.canReview(trade, viewer.id()),
+                blockRepository.existsBetween(viewer.id(), room.getOpponentId(viewer.id())));
     }
 }

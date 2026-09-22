@@ -82,7 +82,7 @@ public class ProductService {
         productRepository.flush();
         if (request.price() < oldPrice) {
             // 찜한 사람에게만 알린다. 받는 사람 조회는 커밋 뒤 알림 쪽에서 한다.
-            eventPublisher.publishEvent(new ProductPriceDroppedEvent(product.getId(), product.getTitle(), oldPrice, request.price()));
+            eventPublisher.publishEvent(new ProductPriceDroppedEvent(product.getId(), product.getSeller().getId(), product.getTitle(), oldPrice, request.price()));
         }
         return ownDetail(product);
     }

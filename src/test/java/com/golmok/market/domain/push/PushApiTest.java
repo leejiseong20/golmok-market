@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -73,6 +74,27 @@ class PushApiTest {
     }
 
     // ---------- 구독 ----------
+
+    @Test
+    void 길이는_맞아도_곡선_밖의_공개키는_저장하지_않는다() throws Exception {
+        byte[] invalid = new byte[65];
+        invalid[0] = 4;
+        subscribe(myToken, body(ENDPOINT, Base64.getUrlEncoder().withoutPadding().encodeToString(invalid), PushTestKeys.BROWSER_AUTH))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_PUSH_SUBSCRIPTION"));
+        assertThat(subscriptions.findAll()).isEmpty();
+    }
+
+    @Test
+    void 한_기기의_발송_예외가_다른_기기를_막지_않는다() throws Exception {
+        subscribe(myToken, body(ENDPOINT, PushTestKeys.BROWSER_PUBLIC, PushTestKeys.BROWSER_AUTH));
+        String second = ENDPOINT + "-second";
+        subscribe(myToken, body(second, PushTestKeys.BROWSER_PUBLIC, PushTestKeys.BROWSER_AUTH));
+        when(gateway.send(anyString(), any(), anyString(), any(), any()))
+                .thenThrow(new IllegalStateException("첫 기기 실패")).thenReturn(PushGateway.Result.SENT);
+        pushService.send(me.getId(), new PushMessage("제목", "내용", "/chat", "test", PushGateway.Urgency.NORMAL));
+        verify(gateway).send(eq(ENDPOINT), any(), anyString(), any(), any());
+        verify(gateway).send(eq(second), any(), anyString(), any(), any());
+    }
 
     @Test
     void 공개키를_내려준다() throws Exception {

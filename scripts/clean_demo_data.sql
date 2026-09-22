@@ -12,6 +12,9 @@
 
 SET NAMES utf8mb4;
 
+-- mysql 을 --force 없이 실행한다. 오류로 연결이 끝나면 아직 커밋하지 않은 삭제는 모두 롤백된다.
+START TRANSACTION;
+
 SET @demo_users = (SELECT GROUP_CONCAT(id) FROM users WHERE email LIKE '%@golmok.test');
 
 DELETE f FROM favorites f
@@ -67,7 +70,15 @@ DELETE ur FROM user_regions ur
 JOIN users u ON u.id = ur.user_id
 WHERE u.email LIKE '%@golmok.test';
 
+-- 데모 회원이 낸 신고만 지운다. 실회원이 남긴 신고는 대상이 없어져도 감사 기록으로 남긴다.
+DELETE r FROM reports r JOIN users u ON u.id = r.reporter_id WHERE u.email LIKE '%@golmok.test';
+DELETE b FROM blocks b JOIN users u ON u.id = b.blocker_id OR u.id = b.blocked_id
+WHERE u.email LIKE '%@golmok.test';
+DELETE s FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE '%@golmok.test';
+
 DELETE FROM users WHERE email LIKE '%@golmok.test';
+
+COMMIT;
 
 SELECT
   (SELECT COUNT(*) FROM users) AS users_left,

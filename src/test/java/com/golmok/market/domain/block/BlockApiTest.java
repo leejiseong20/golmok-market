@@ -78,6 +78,24 @@ class BlockApiTest {
                 .andExpect(status().isCreated());
     }
 
+    @Test
+    void 차단하면_새_예약과_예약_버튼을_막지만_기존_예약은_취소할_수_있다() throws Exception {
+        ChatRoom room = chatRooms.saveAndFlush(ChatRoom.open(otherProduct, me));
+        mvc.perform(post("/api/chat-rooms/{id}/reservation", room.getId())
+                        .header("Authorization", "Bearer " + otherToken)).andExpect(status().isOk());
+        block(myToken, other.getId());
+        mvc.perform(delete("/api/chat-rooms/{id}/reservation", room.getId())
+                        .header("Authorization", "Bearer " + myToken)).andExpect(status().isOk());
+        mvc.perform(get("/api/chat-rooms/{id}", room.getId()).header("Authorization", "Bearer " + otherToken))
+                .andExpect(jsonPath("$.tradeActions.reserve").value(false));
+        mvc.perform(post("/api/chat-rooms/{id}/reservation", room.getId())
+                        .header("Authorization", "Bearer " + otherToken)).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/users/{id}/block", other.getId()).header("Authorization", "Bearer " + myToken));
+        block(otherToken, me.getId());
+        mvc.perform(post("/api/chat-rooms/{id}/reservation", room.getId())
+                        .header("Authorization", "Bearer " + otherToken)).andExpect(status().isForbidden());
+    }
+
     // ---------- 차단 자체 ----------
 
     @Test

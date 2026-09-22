@@ -1,6 +1,5 @@
 package com.golmok.market.domain.push;
 
-import javax.crypto.KeyAgreement;
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;
 import java.security.GeneralSecurityException;
@@ -10,12 +9,14 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.spec.ECFieldFp;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPrivateKeySpec;
 import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
+import javax.crypto.KeyAgreement;
 
 /**
  * 웹 푸시가 쓰는 P-256 타원곡선 키 다루기. JDK 표준 API 만 쓴다(외부 암호 라이브러리 없음).
@@ -59,10 +60,17 @@ final class P256 {
         }
         BigInteger x = new BigInteger(1, Arrays.copyOfRange(encoded, 1, 1 + COORDINATE_LENGTH));
         BigInteger y = new BigInteger(1, Arrays.copyOfRange(encoded, 1 + COORDINATE_LENGTH, PUBLIC_KEY_LENGTH));
+        // KeyFactory 는 키를 감싸기만 할 수 있다. 저장 전에 좌표 범위와 곡선 방정식을 직접 확인한다.
+        BigInteger prime = ((ECFieldFp) PARAMS.getCurve().getField()).getP();
+        BigInteger expected = x.pow(3).add(PARAMS.getCurve().getA().multiply(x))
+                .add(PARAMS.getCurve().getB()).mod(prime);
+        if (x.compareTo(prime) >= 0 || y.compareTo(prime) >= 0 || !y.pow(2).mod(prime).equals(expected)) {
+            throw new IllegalArgumentException("P-256 곡선 위의 점이 아닙니다");
+        }
         try {
             return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(new ECPublicKeySpec(new ECPoint(x, y), PARAMS));
         } catch (GeneralSecurityException e) {
-            // 곡선 위에 없는 점이면 여기서 걸린다. 잘못된 점으로 키 합의를 하면 비밀이 새는 공격이 있다.
+            // 좌표 검증을 통과했어도 제공자가 키를 만들지 못하면 입력 오류로 처리한다.
             throw new IllegalArgumentException("P-256 공개키가 올바르지 않습니다", e);
         }
     }

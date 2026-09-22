@@ -122,12 +122,17 @@ public class PushService {
         }
         byte[] payload = payload(message);
         for (PushSubscription subscription : subscriptions) {
-            byte[] body = WebPushEncryptor.encrypt(payload,
-                    decode(subscription.getP256dh()), decode(subscription.getAuth()));
-            PushGateway.Result result = gateway.send(subscription.getEndpoint(), body,
-                    vapid.authorization(subscription.getEndpoint(), clock.instant()), TTL, message.urgency());
-            if (result == PushGateway.Result.GONE) {
-                subscriptionRepository.deleteById(subscription.getId());
+            try {
+                byte[] body = WebPushEncryptor.encrypt(payload,
+                        decode(subscription.getP256dh()), decode(subscription.getAuth()));
+                PushGateway.Result result = gateway.send(subscription.getEndpoint(), body,
+                        vapid.authorization(subscription.getEndpoint(), clock.instant()), TTL, message.urgency());
+                if (result == PushGateway.Result.GONE) {
+                    subscriptionRepository.deleteById(subscription.getId());
+                }
+            } catch (RuntimeException e) {
+                // 한 기기의 잘못된 키나 전송 실패가 다른 기기까지 막지 않게 한다. 키·주소는 기록하지 않는다.
+                log.warn("푸시 구독 {} 발송 실패", subscription.getId());
             }
         }
     }

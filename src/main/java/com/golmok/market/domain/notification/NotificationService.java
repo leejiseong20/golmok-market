@@ -1,9 +1,9 @@
 package com.golmok.market.domain.notification;
 
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.notification.dto.NotificationResponse;
 import com.golmok.market.domain.notification.dto.UnreadCountResponse;
 import com.golmok.market.domain.notification.event.NotificationCreatedEvent;
-import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.notification.event.NotificationRequestedEvent;
 import com.golmok.market.domain.product.FavoriteRepository;
 import com.golmok.market.domain.product.event.ProductPriceDroppedEvent;
@@ -53,7 +53,7 @@ public class NotificationService {
         String content = "%s · %s → %s".formatted(event.title(), price(event.oldPrice()), price(event.newPrice()));
         for (Long userId : favoriteRepository.findUserIdsByProductId(event.productId())) {
             save(new NotificationRequestedEvent(userId, NotificationType.PRICE_DROP, "찜한 상품의 가격이 내려갔어요",
-                    content, NotificationRequestedEvent.productUrl(event.productId())));
+                    content, NotificationRequestedEvent.productUrl(event.productId()), event.sellerId()));
         }
     }
 

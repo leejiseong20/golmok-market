@@ -72,20 +72,20 @@ public record ChatRoomResponse(
      */
     public record TradeActions(boolean reserve, boolean cancel, boolean complete, boolean review) {
 
-        public static TradeActions of(ChatRoom room, Trade trade, Long viewerId, boolean canReview) {
+        public static TradeActions of(ChatRoom room, Trade trade, Long viewerId, boolean canReview, boolean blocked) {
             boolean seller = !room.isBuyer(viewerId);
             Product product = room.getProduct();
             boolean reserved = trade != null && trade.getStatus() == TradeStatus.REQUESTED;
             return new TradeActions(
                     seller && trade == null && !product.isDeleted() && product.getStatus() == ProductStatus.ON_SALE
-                            && !room.getBuyer().isWithdrawn(),
+                            && !room.getBuyer().isWithdrawn() && !blocked,
                     reserved,
                     seller && reserved,
                     canReview);
         }
     }
 
-    public static ChatRoomResponse of(ChatRoom room, Long viewerId, String thumbnailUrl, Trade trade, boolean canReview) {
+    public static ChatRoomResponse of(ChatRoom room, Long viewerId, String thumbnailUrl, Trade trade, boolean canReview, boolean blocked) {
         return new ChatRoomResponse(
                 room.getId(),
                 ProductInfo.of(room.getProduct(), thumbnailUrl),
@@ -93,7 +93,7 @@ public record ChatRoomResponse(
                 room.isBuyer(viewerId) ? Role.BUYER : Role.SELLER,
                 room.hasOpponentLeft(viewerId),
                 TradeInfo.of(trade),
-                TradeActions.of(room, trade, viewerId, canReview),
+                TradeActions.of(room, trade, viewerId, canReview, blocked),
                 room.getCreatedAt());
     }
 }

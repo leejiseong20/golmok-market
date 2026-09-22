@@ -1,5 +1,6 @@
 package com.golmok.market.domain.trade;
 
+import com.golmok.market.domain.block.BlockRepository;
 import com.golmok.market.domain.chat.ChatRoom;
 import com.golmok.market.domain.chat.ChatRoomRepository;
 import com.golmok.market.domain.chat.ChatService;
@@ -41,12 +42,16 @@ public class ChatTradeService {
     private final ProductRepository productRepository;
     private final TradeRepository tradeRepository;
     private final ChatService chatService;
+    private final BlockRepository blockRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ChatRoomResponse reserve(long roomId, AuthUser viewer) {
         Locked locked = lock(roomId, viewer);
         requireSeller(locked.room(), viewer);
+        if (blockRepository.existsBetween(viewer.id(), locked.room().getOpponentId(viewer.id()))) {
+            throw new BusinessException(ErrorCode.BLOCKED_USER);
+        }
         if (locked.room().getBuyer().isWithdrawn()) {
             throw new BusinessException(ErrorCode.CHAT_OPPONENT_WITHDRAWN);
         }
