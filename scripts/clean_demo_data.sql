@@ -7,7 +7,9 @@
 -- 실행: mysql -u root -p golmok < scripts/clean_demo_data.sql
 --
 -- 지우는 순서는 외래키 방향의 역순이다.
--- (favorites·reviews·trades·chat_rooms·images → products → notifications·refresh_tokens·user_regions → users)
+-- (favorites·reviews·trades·chat_rooms·images → products → notifications·refresh_tokens·user_regions
+--  · reports·blocks·push_subscriptions · search_logs(사용자만 비움) → users)
+-- payments 는 지우지 않는다. 결제는 범위에서 제외돼 결제 행을 만드는 API·시드가 없다. 결제를 붙이면 trades 보다 먼저 지워야 한다.
 -- ============================================================
 
 SET NAMES utf8mb4;
@@ -75,6 +77,11 @@ DELETE r FROM reports r JOIN users u ON u.id = r.reporter_id WHERE u.email LIKE 
 DELETE b FROM blocks b JOIN users u ON u.id = b.blocker_id OR u.id = b.blocked_id
 WHERE u.email LIKE '%@golmok.test';
 DELETE s FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE u.email LIKE '%@golmok.test';
+
+-- 데모 회원이 로그인한 채 검색한 기록. 지우지 않고 사용자만 비운다 — 인기 검색어 집계가 데모 정리로 바뀌면 안 되고,
+-- 비로그인 검색도 user_id 가 NULL 이라 허용된 상태다(어차피 정리 배치가 7일 뒤 지운다).
+-- 빠져 있을 때 회원 삭제가 fk_search_logs_user 로 실패했다(2026-09-22 일회용 MySQL 에서 재현).
+UPDATE search_logs sl JOIN users u ON u.id = sl.user_id SET sl.user_id = NULL WHERE u.email LIKE '%@golmok.test';
 
 DELETE FROM users WHERE email LIKE '%@golmok.test';
 
