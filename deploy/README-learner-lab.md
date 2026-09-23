@@ -181,6 +181,9 @@ curl https://<도메인>/api/categories
 서버 `.env` 의 `CORS_ALLOWED_ORIGINS` 를 Vercel 주소로 맞춘 뒤 `docker compose up -d app`.
 **이 두 가지를 빠뜨리면 목록은 보이는데 로그인만 403 이 난다.**
 
+> 새 버전 배포와 **Caddyfile 을 바꿨을 때의 주의(컨테이너를 다시 만들어야 반영된다)** 는
+> [README.md 의 "새 버전 배포"](README.md#새-버전-배포)를 그대로 따른다.
+
 ---
 
 ## 6. 세션이 끝난 뒤, 다시 시작할 때

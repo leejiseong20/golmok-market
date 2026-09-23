@@ -221,6 +221,21 @@ docker compose up -d app
 업로드 이미지와 DB는 볼륨에 있어 컨테이너를 바꿔도 남는다.
 **`docker compose down -v`는 볼륨(DB·이미지·인증서)까지 지운다. 운영에서 쓰지 않는다.**
 
+### 설정 파일(Caddyfile)을 바꿨다면 컨테이너를 **다시 만들어야** 한다
+
+`Caddyfile` 은 파일 하나를 컨테이너 안에 연결(bind mount)한다. `git pull` 은 파일을 고치는 게 아니라
+**새 파일로 바꿔 놓기 때문에**, 돌고 있는 컨테이너는 예전 파일을 계속 붙들고 있다.
+그래서 `caddy reload` 를 해도 "config is unchanged" 가 나오고 새 설정이 반영되지 않는다(2026-09-23 실제로 겪었다).
+
+```bash
+docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile  # 먼저 검사
+docker compose up -d --force-recreate caddy                                                    # 다시 만들어야 반영된다
+curl -s -D - -o /dev/null https://<도메인>/api/categories | grep -i strict-transport            # 확인
+```
+
+**검사를 먼저 한다.** 잘못된 설정으로 다시 만들면 Caddy 가 뜨지 못해 사이트 전체가 내려간다.
+앱(`app`)은 이미지를 통째로 바꾸므로 이 문제가 없다.
+
 ---
 
 ## 백업
