@@ -1,0 +1,14 @@
+[Unit]
+# DB·업로드 사진 백업. timer 가 하루 한 번 실행한다.
+Description=골목마켓 DB·사진 백업
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/golmok-market/deploy
+ExecStart=/home/ubuntu/golmok-market/deploy/backup.sh
+# 컨테이너가 아직 안 올라왔으면 실패한다. 조금 뒤 다시 시도한다.
+Restart=on-failure
+RestartSec=60s

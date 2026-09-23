@@ -1,0 +1,12 @@
+[Unit]
+Description=골목마켓 백업 주기 실행
+
+[Timer]
+# 매일 새벽 4시 30분(서버 시간대). 정리 배치(4시)가 끝난 뒤에 받는다.
+OnCalendar=*-*-* 04:30:00
+# 그 시각에 서버가 꺼져 있었으면(랩 세션 종료 등) 켜진 뒤 한 번 실행한다.
+Persistent=true
+Unit=golmok-backup.service
+
+[Install]
+WantedBy=timers.target

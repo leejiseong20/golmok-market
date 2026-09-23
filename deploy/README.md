@@ -240,17 +240,55 @@ curl -s -D - -o /dev/null https://<도메인>/api/categories | grep -i strict-tr
 
 ## 백업
 
-서버가 회수되거나 망가질 때를 대비해 정기적으로 받아 **서버 밖(내 PC 등)에 보관**한다.
+서버가 회수되거나 망가질 때를 대비한다. **서버 안에만 두면 서버와 함께 사라지므로, 내 PC 로 가져와 보관한다.**
+
+`backup.sh` 가 DB 덤프와 업로드 사진을 `~/backups` 에 받고(권한 600), 덤프가 끝까지 받아졌는지·압축이 깨지지 않았는지 확인한 뒤
+14일(`BACKUP_KEEP_DAYS`) 지난 파일을 지운다. 비밀번호는 컨테이너 안의 환경변수를 쓰므로 명령줄에 남지 않는다.
 
 ```bash
-docker compose exec -T mysql mysqldump -uroot -p"$(grep MYSQL_ROOT_PASSWORD .env | cut -d= -f2-)" \
-  --single-transaction --default-character-set=utf8mb4 golmok > backup-$(date +%F).sql
+cd ~/golmok-market/deploy
+chmod +x backup.sh restore.sh
+./backup.sh                       # 손으로 한 번 받아 본다
 ```
 
-내 PC로 가져오기:
+**매일 자동으로 받기** (systemd timer, 새벽 4시 30분 · 꺼져 있던 동안 걸렀으면 켜질 때 한 번)
 
 ```bash
-scp -i ssh-key.key ubuntu@<공인 IP>:~/golmok-market/deploy/backup-*.sql .
+sudo cp golmok-backup.service golmok-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now golmok-backup.timer
+systemctl list-timers golmok-backup.timer   # 다음 실행 시각 확인
+journalctl -u golmok-backup.service -n 20   # 결과 확인
+```
+
+**내 PC 로 가져오기**
+
+```bash
+scp -i ssh-key.key ubuntu@<공인 IP>:'~/backups/golmok-*' .
+```
+
+## 복구
+
+```bash
+./restore.sh <대상DB> <db.sql.gz> [uploads.tar.gz]
+```
+
+대상 DB 이름을 직접 적어야 한다(기본값을 두면 연습하려다 운영 DB 를 덮어쓴다).
+운영 DB(`golmok`)에 복구할 때만 `CONFIRM=yes` 가 더 필요하고, 사진 복구는 운영 볼륨이 하나뿐이라 연습용 DB 에서는 막아 둔다.
+
+**연습은 임시 DB 로 한다.** 실제로 해 보지 않은 복구 절차는 없는 것과 같다.
+
+```bash
+./restore.sh golmok_restore_check ~/backups/golmok-db-2026-09-23.sql.gz
+# 운영과 행 수·내용이 같은지 비교한 뒤
+docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot -e "DROP DATABASE golmok_restore_check;"'
+```
+
+운영에 되돌릴 때:
+
+```bash
+CONFIRM=yes ./restore.sh golmok ~/backups/golmok-db-<날짜>.sql.gz ~/backups/golmok-uploads-<날짜>.tar.gz
+docker compose restart app
 ```
 
 ---
