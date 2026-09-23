@@ -52,6 +52,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
+    private final LoginAttemptGuard loginAttemptGuard;
     private final Clock clock;
 
     // ---------- 가입 ----------
@@ -96,16 +97,22 @@ public class AuthService {
     // ---------- 로그인 ----------
 
     @Transactional
-    public LoginResponse login(LoginRequest request, String userAgent) {
+    public LoginResponse login(LoginRequest request, String userAgent, String clientIp) {
+        // 실패 횟수를 먼저 본다. 잠긴 동안에는 비밀번호가 맞아도 막는다(LoginAttemptGuard 주석 참고).
+        loginAttemptGuard.check(request.normalizedEmail(), clientIp);
         User user = userRepository.findByEmail(request.normalizedEmail())
                 .filter(found -> passwordEncoder.matches(request.password(), found.getPassword()))
                 // 이메일이 없는 경우와 비밀번호가 틀린 경우를 같은 응답으로 준다.
                 // 다르게 주면 로그인 API 로 가입 여부를 대량 조회할 수 있다.
-                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
+                .orElseThrow(() -> {
+                    loginAttemptGuard.recordFailure(request.normalizedEmail(), clientIp);
+                    return new BusinessException(ErrorCode.LOGIN_FAILED);
+                });
 
         // 비밀번호 확인 뒤에 상태를 본다. 비밀번호를 모르는 사람에게 "정지된 계정"인지 알려줄 이유가 없다.
         requireActive(user);
 
+        loginAttemptGuard.recordSuccess(request.normalizedEmail());
         user.recordLogin();
         TokenResponse tokens = issueTokens(user, userAgent);
         var primaryRegion = userRegionRepository.findPrimaryWithRegion(user.getId()).orElse(null);

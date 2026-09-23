@@ -4,6 +4,7 @@ import com.golmok.market.domain.user.UserRole;
 import com.golmok.market.global.security.JwtProperties;
 import com.golmok.market.global.security.JwtTokenProvider;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,7 @@ import java.time.temporal.ChronoUnit;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -36,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthApiTest {
 
     @Autowired MockMvc mockMvc;
+    @Autowired LoginAttemptGuard loginAttemptGuard;
     @Autowired JwtProperties jwtProperties;
 
     private static final String SIGNUP_BODY = """
@@ -44,6 +47,12 @@ class AuthApiTest {
     private static final String LOGIN_BODY = """
             { "email": "user@example.com", "password": "Password123!" }
             """;
+
+    // 빈이 하나라 테스트끼리 실패 횟수가 쌓인다. 각 테스트를 깨끗한 상태에서 시작한다.
+    @BeforeEach
+    void clearLoginAttempts() {
+        loginAttemptGuard.reset();
+    }
 
     private String loginAndGetBody() throws Exception {
         mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(SIGNUP_BODY))
@@ -70,6 +79,35 @@ class AuthApiTest {
                 .andExpect(jsonPath("$.user.nickname").value("골목이"))
                 .andExpect(jsonPath("$.user.profileImageUrl").isEmpty())
                 .andExpect(jsonPath("$.user.primaryRegion").isEmpty());
+    }
+
+    @Test
+    void 로그인을_연달아_실패하면_429_로_막고_맞는_비밀번호도_막는다() throws Exception {
+        mockMvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(SIGNUP_BODY))
+                .andExpect(status().isCreated());
+        String wrongPassword = """
+                { "email": "user@example.com", "password": "Wrong123!" }
+                """;
+
+        for (int i = 0; i < LoginAttemptGuard.EMAIL_LIMIT; i++) {
+            mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(wrongPassword))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+        }
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(wrongPassword))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_LOGIN_ATTEMPTS"));
+        // 잠긴 동안에는 비밀번호가 맞아도 막는다. 통과시키면 대입 공격을 늦추지 못한다.
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void 공개_조회는_HEAD_도_열려_있다() throws Exception {
+        // 서버 감시 도구는 본문이 필요 없어 HEAD 로 확인한다. GET 만 열어 두면 401 을 장애로 읽는다.
+        mockMvc.perform(head("/api/categories")).andExpect(status().isOk());
+        mockMvc.perform(head("/api/users/me")).andExpect(status().isUnauthorized());
     }
 
     @Test

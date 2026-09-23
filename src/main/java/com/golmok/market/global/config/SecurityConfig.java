@@ -42,6 +42,17 @@ import java.util.List;
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
+    /** 비로그인 사용자도 볼 수 있는 조회 경로. 업로드 이미지는 목록·상세에서 비로그인도 봐야 한다. */
+    private static final String[] PUBLIC_READ_PATHS = {
+            "/api/products", "/api/products/*",
+            "/api/categories",
+            "/api/regions", "/api/regions/nearby",
+            "/api/users/*",
+            "/api/users/*/reviews",
+            "/api/search/keywords/popular",
+            "/api/images/**",
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtTokenProvider tokenProvider,
@@ -57,23 +68,19 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        // "/me" 는 아래 공개 GET 패턴(/api/users/*, /api/products/*)에 걸리므로 먼저 막는다.
+                        // "/me" 는 아래 공개 조회 패턴(/api/users/*, /api/products/*)에 걸리므로 먼저 막는다.
+                        // HEAD 를 빠뜨리면 인증 없이 컨트롤러까지 가 500 이 난다(테스트가 잡았다).
                         .requestMatchers(HttpMethod.GET, "/api/users/me", "/api/products/me").authenticated()
+                        .requestMatchers(HttpMethod.HEAD, "/api/users/me", "/api/products/me").authenticated()
 
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/reissue").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-email", "/api/auth/check-nickname").permitAll()
 
-                        // 업로드한 이미지 파일. 목록·상세에서 비로그인도 봐야 한다.
-                        .requestMatchers(HttpMethod.GET, "/api/images/**").permitAll()
-
-                        // 비로그인 사용자도 둘러볼 수 있는 조회 API
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/products", "/api/products/*",
-                                "/api/categories",
-                                "/api/regions", "/api/regions/nearby",
-                                "/api/users/*",
-                                "/api/users/*/reviews",
-                                "/api/search/keywords/popular").permitAll()
+                        // 비로그인 사용자도 둘러볼 수 있는 조회 API(업로드 이미지 포함).
+                        // HEAD 도 함께 연다 — 본문 없는 GET 이라 공개 범위가 넓어지지 않고,
+                        // 서버 감시 도구(UptimeRobot 등)가 HEAD 로 확인해 401 을 "장애"로 잘못 읽는 것을 막는다.
+                        .requestMatchers(HttpMethod.GET, PUBLIC_READ_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.HEAD, PUBLIC_READ_PATHS).permitAll()
 
                         // 채팅 WebSocket 연결 요청. 브라우저가 헤더를 붙일 수 없어 여기서는 열고,
                         // 인증은 첫 STOMP 프레임(CONNECT)에서 한다(StompAuthChannelInterceptor).

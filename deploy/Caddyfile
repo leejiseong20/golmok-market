@@ -3,6 +3,17 @@
 {$DOMAIN} {
 	encode gzip
 
+	# 응답 헤더.
+	# HSTS: 브라우저가 이 도메인을 한 번 본 뒤로는 http 로 접속하지 않는다(중간에서 가로채 평문으로 떨어뜨리는 공격 방지).
+	#   preload 는 넣지 않는다 — 목록에 올리면 빼기 어렵고, 이 도메인은 시연용이다.
+	# Referrer-Policy: 다른 사이트로 이동할 때 전체 주소 대신 출처만 보낸다.
+	# X-Frame-Options · X-Content-Type-Options 는 Spring Security 가 이미 붙인다(중복해서 넣지 않는다).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
 	# 백엔드는 컨테이너 네트워크 안의 app:8080. 외부에서 8080 으로 직접 접근할 수 없다.
 	reverse_proxy app:8080
 }

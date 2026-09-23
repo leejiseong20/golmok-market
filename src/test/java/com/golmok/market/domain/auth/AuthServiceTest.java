@@ -19,6 +19,7 @@ import com.golmok.market.global.security.AuthUser;
 import com.golmok.market.global.security.TokenHasher;
 import jakarta.persistence.EntityManager;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,21 +38,29 @@ class AuthServiceTest {
 
     private static final String PASSWORD = "Password123!";
     private static final String USER_AGENT = "JUnit";
+    private static final String CLIENT_IP = "127.0.0.1";
 
     @Autowired AuthService authService;
     @Autowired UserRepository userRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
     @Autowired UserRegionRepository userRegionRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired LoginAttemptGuard loginAttemptGuard;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired EntityManager em;
+
+    // 빈이 하나라 테스트끼리 실패 횟수가 쌓인다.
+    @BeforeEach
+    void clearLoginAttempts() {
+        loginAttemptGuard.reset();
+    }
 
     private SignupResponse signup(String email, String nickname) {
         return authService.signup(new SignupRequest(email, PASSWORD, nickname, null));
     }
 
     private LoginResponse login(String email) {
-        return authService.login(new LoginRequest(email, PASSWORD), USER_AGENT);
+        return authService.login(new LoginRequest(email, PASSWORD), USER_AGENT, CLIENT_IP);
     }
 
     private static void assertErrorCode(ThrowingCallable call, ErrorCode expected) {
@@ -141,7 +150,7 @@ class AuthServiceTest {
     void 비밀번호가_틀린_경우와_없는_이메일은_같은_LOGIN_FAILED() {
         signup("user@example.com", "골목이");
 
-        assertErrorCode(() -> authService.login(new LoginRequest("user@example.com", "Wrong123!"), USER_AGENT),
+        assertErrorCode(() -> authService.login(new LoginRequest("user@example.com", "Wrong123!"), USER_AGENT, CLIENT_IP),
                 ErrorCode.LOGIN_FAILED);
         assertErrorCode(() -> login("nobody@example.com"), ErrorCode.LOGIN_FAILED);
     }
