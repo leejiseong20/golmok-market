@@ -56,6 +56,10 @@ app:
     read-notification-retention: 30d
     unread-notification-retention: 90d
     batch-size: 1000
+    # 상품에 연결되지 않은 사진 파일을 지우기까지 두는 유예. 방금 올려 아직 등록 창에 있는 사진을 지우지 않기 위한 값이다.
+    orphan-image-retention: 3d
+    # 고아 사진을 찾을 때 DB 에 한 번에 물어볼 주소 수.
+    image-batch-size: 500
 
 spring.servlet.multipart:
   max-file-size: 5MB

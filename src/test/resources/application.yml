@@ -43,6 +43,8 @@ app:
     read-notification-retention: 30d
     unread-notification-retention: 90d
     batch-size: 1000
+    orphan-image-retention: 3d
+    image-batch-size: 500
 
 spring.servlet.multipart:
   max-file-size: 5MB

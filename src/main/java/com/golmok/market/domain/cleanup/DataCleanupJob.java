@@ -2,6 +2,7 @@ package com.golmok.market.domain.cleanup;
 
 import com.golmok.market.domain.notification.NotificationRepository;
 import com.golmok.market.domain.search.SearchLogRepository;
+import com.golmok.market.domain.image.OrphanImageCleaner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.domain.PageRequest;
@@ -33,29 +34,32 @@ public class DataCleanupJob {
 
     private final SearchLogRepository searchLogRepository;
     private final NotificationRepository notificationRepository;
+    private final OrphanImageCleaner orphanImageCleaner;
     private final CleanupProperties properties;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     public DataCleanupJob(SearchLogRepository searchLogRepository, NotificationRepository notificationRepository,
+                          OrphanImageCleaner orphanImageCleaner,
                           CleanupProperties properties, PlatformTransactionManager transactionManager, Clock clock) {
         this.searchLogRepository = searchLogRepository;
         this.notificationRepository = notificationRepository;
+        this.orphanImageCleaner = orphanImageCleaner;
         this.properties = properties;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
 
     /** 정리 결과. 운영 로그로 남겨 얼마나 지워졌는지 추적한다. */
-    public record CleanupResult(long searchLogs, long readNotifications, long unreadNotifications) {
+    public record CleanupResult(long searchLogs, long readNotifications, long unreadNotifications, long orphanImages) {
     }
 
     @Scheduled(cron = "${app.cleanup.cron}", zone = "Asia/Seoul")
     public void runScheduled() {
         try {
             CleanupResult result = run();
-            log.info("오래된 데이터 정리 완료: 검색 로그 {}건, 읽은 알림 {}건, 안 읽은 알림 {}건",
-                    result.searchLogs(), result.readNotifications(), result.unreadNotifications());
+            log.info("오래된 데이터 정리 완료: 검색 로그 {}건, 읽은 알림 {}건, 안 읽은 알림 {}건, 고아 사진 {}장",
+                    result.searchLogs(), result.readNotifications(), result.unreadNotifications(), result.orphanImages());
         } catch (RuntimeException e) {
             // 실패해도 다음 날 다시 돈다. 스케줄러 스레드가 예외로 죽지 않게 기록만 한다.
             log.error("오래된 데이터 정리 실패", e);
@@ -77,7 +81,9 @@ public class DataCleanupJob {
         long unreadNotifications = deleteInBatches(
                 page -> notificationRepository.findIdsCreatedBefore(false, unreadBefore, page),
                 notificationRepository::deleteByIdIn);
-        return new CleanupResult(searchLogs, readNotifications, unreadNotifications);
+        // 사진은 DB 가 아니라 파일이라 트랜잭션 밖이다. 앞의 삭제가 끝난 뒤에 지운다.
+        long orphanImages = orphanImageCleaner.clean(properties.orphanImageRetention(), properties.imageBatchSize());
+        return new CleanupResult(searchLogs, readNotifications, unreadNotifications, orphanImages);
     }
 
     /**

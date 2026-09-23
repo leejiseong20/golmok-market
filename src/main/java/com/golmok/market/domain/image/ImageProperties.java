@@ -2,6 +2,8 @@ package com.golmok.market.domain.image;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.nio.file.Path;
+
 /**
  * @param uploadDir 이미지를 저장할 디렉터리. 로컬 디스크다.
  *                  배포 시 컨테이너·인스턴스가 바뀌면 파일이 사라지므로 볼륨을 붙이거나 S3 로 옮겨야 한다.
@@ -21,5 +23,10 @@ public record ImageProperties(String uploadDir, int maxCount, int thumbnailMaxEd
         if (thumbnailMaxEdge < 1) {
             throw new IllegalStateException("app.image.thumbnail-max-edge 는 1 이상이어야 합니다.");
         }
+    }
+
+    /** 업로드 루트. 고아 사진 정리가 "이 아래만 지운다"는 기준으로 쓴다. */
+    public Path uploadRoot() {
+        return Path.of(uploadDir);
     }
 }

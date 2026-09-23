@@ -13,10 +13,14 @@ import java.time.Duration;
  * @param readNotificationRetention   읽은 알림 보관 기간
  * @param unreadNotificationRetention 안 읽은 알림 보관 기간. 오래 접속하지 않은 사람도 돌아와서 볼 여유를 둔다
  * @param batchSize                   한 트랜잭션에서 지우는 최대 행 수
+ * @param orphanImageRetention        상품이 가리키지 않는 사진 파일을 지우기까지 두는 유예.
+ *                                    사진은 올리는 즉시 저장되고 상품 저장은 그 뒤이므로, 유예가 없으면 작성 중인 사진을 지운다
+ * @param imageBatchSize              고아 사진을 찾을 때 DB 에 한 번에 물어볼 주소 수
  */
 @ConfigurationProperties(prefix = "app.cleanup")
 public record CleanupProperties(String cron, Duration searchLogRetention, Duration readNotificationRetention,
-                                Duration unreadNotificationRetention, int batchSize) {
+                                Duration unreadNotificationRetention, int batchSize,
+                                Duration orphanImageRetention, int imageBatchSize) {
 
     public CleanupProperties {
         if (cron == null || !CronExpression.isValidExpression(cron)) {
@@ -27,6 +31,10 @@ public record CleanupProperties(String cron, Duration searchLogRetention, Durati
         requirePositive("unread-notification-retention", unreadNotificationRetention);
         if (batchSize < 1) {
             throw new IllegalStateException("app.cleanup.batch-size 는 1 이상이어야 합니다.");
+        }
+        requirePositive("orphan-image-retention", orphanImageRetention);
+        if (imageBatchSize < 1) {
+            throw new IllegalStateException("app.cleanup.image-batch-size 는 1 이상이어야 합니다.");
         }
     }
 

@@ -1,8 +1,11 @@
 package com.golmok.market.domain.cleanup;
 
+import com.golmok.market.domain.image.ImageProperties;
+import com.golmok.market.domain.image.OrphanImageCleaner;
 import com.golmok.market.domain.notification.Notification;
 import com.golmok.market.domain.notification.NotificationRepository;
 import com.golmok.market.domain.notification.NotificationType;
+import com.golmok.market.domain.product.ProductImageRepository;
 import com.golmok.market.domain.search.SearchLog;
 import com.golmok.market.domain.search.SearchLogRepository;
 import com.golmok.market.domain.user.User;
@@ -38,6 +41,7 @@ class DataCleanupJobTest {
     @Autowired UserRepository userRepository;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired EntityManager em;
+    @Autowired ProductImageRepository productImageRepository;
 
     private User user;
 
@@ -48,8 +52,12 @@ class DataCleanupJobTest {
 
     private DataCleanupJob job(int batchSize) {
         CleanupProperties properties = new CleanupProperties("0 0 4 * * *",
-                Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), batchSize);
-        return new DataCleanupJob(searchLogRepository, notificationRepository, properties, transactionManager, CLOCK);
+                Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), batchSize, Duration.ofDays(3), 500);
+        // 사진 정리는 OrphanImageCleanerTest 에서 본다. 여기서는 DB 정리만 보므로 없는 폴더를 가리켜 아무것도 지우지 않게 한다.
+        OrphanImageCleaner imageCleaner = new OrphanImageCleaner(
+                new ImageProperties("build/tmp/uploads-없음", 10, 640), productImageRepository, CLOCK);
+        return new DataCleanupJob(searchLogRepository, notificationRepository,
+                imageCleaner, properties, transactionManager, CLOCK);
     }
 
     /** 생성 시각은 저장 때 자동으로 채워지므로 저장 뒤 원하는 시각으로 바꾼다. */
@@ -125,16 +133,21 @@ class DataCleanupJobTest {
         searchLog("최근", NOW);
         notification(false, NOW);
 
-        assertThat(job(2).run()).isEqualTo(new DataCleanupJob.CleanupResult(0, 0, 0));
+        assertThat(job(2).run()).isEqualTo(new DataCleanupJob.CleanupResult(0, 0, 0, 0));
     }
 
     @Test
     void 잘못된_설정은_기동할_때_막는다() {
-        assertThatThrownBy(() -> new CleanupProperties("매일 새벽", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 1000))
+        assertThatThrownBy(() -> new CleanupProperties("매일 새벽", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 1000, Duration.ofDays(3), 500))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ZERO, Duration.ofDays(30), Duration.ofDays(90), 1000))
+        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ZERO, Duration.ofDays(30), Duration.ofDays(90), 1000, Duration.ofDays(3), 500))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 0))
+        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 0, Duration.ofDays(3), 500))
+                .isInstanceOf(IllegalStateException.class);
+        // 사진 정리 설정도 같은 기준으로 막는다.
+        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 1000, Duration.ZERO, 500))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new CleanupProperties("0 0 4 * * *", Duration.ofDays(7), Duration.ofDays(30), Duration.ofDays(90), 1000, Duration.ofDays(3), 0))
                 .isInstanceOf(IllegalStateException.class);
     }
 }
