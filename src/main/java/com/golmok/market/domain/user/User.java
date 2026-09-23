@@ -107,4 +107,25 @@ public class User extends BaseTimeEntity {
     public boolean isActive() {
         return this.status == UserStatus.ACTIVE;
     }
+
+    // ---------- 관리자 조치 ----------
+    // 정지는 탈퇴와 다르다. 개인정보를 지우지 않고 상태만 바꾼다(해제하면 그대로 돌아온다).
+    // 로그인·재발급은 requireActive 가 막는다. 이미 발급된 access token 은 만료(최대 30분)까지 살아 있다.
+
+    public void suspend() {
+        if (isWithdrawn()) {
+            return;   // 이미 탈퇴한 회원은 상태를 되돌리지 않는다
+        }
+        this.status = UserStatus.SUSPENDED;
+    }
+
+    public void unsuspend() {
+        if (this.status == UserStatus.SUSPENDED) {
+            this.status = UserStatus.ACTIVE;
+        }
+    }
+
+    public boolean isSuspended() {
+        return this.status == UserStatus.SUSPENDED;
+    }
 }

@@ -86,6 +86,9 @@ public class SecurityConfig {
                         // 인증은 첫 STOMP 프레임(CONNECT)에서 한다(StompAuthChannelInterceptor).
                         .requestMatchers(HttpMethod.GET, WebSocketConfig.ENDPOINT).permitAll()
 
+                        // 관리자 전용. 권한이 없으면 404 로 답한다(RestAccessDeniedHandler) — 403 은 관리자 기능의 존재를 알려 준다.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         // 컨트롤러 밖 오류가 /error 로 포워드될 때 401 로 덮이지 않도록
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())

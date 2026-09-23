@@ -351,12 +351,36 @@ CREATE TABLE reports (
     target_id   BIGINT       NOT NULL,
     reason      VARCHAR(30)  NOT NULL COMMENT 'SPAM | FRAUD | PROHIBITED | ABUSE | OTHER',
     detail      VARCHAR(500) NULL COMMENT '신고자가 적은 설명. 사유가 OTHER 면 필수',
+    status      VARCHAR(20)  NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING | RESOLVED | REJECTED',
+    handled_at  DATETIME     NULL COMMENT '관리자가 처리한 시각',
+    handled_by  BIGINT       NULL COMMENT '처리한 관리자',
+    admin_memo  VARCHAR(500) NULL COMMENT '관리자가 남긴 판단 근거',
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_report (reporter_id, target_type, target_id) COMMENT '같은 대상 중복 신고 방지',
     KEY idx_reports_target (target_type, target_id) COMMENT '대상별 신고 조회용',
-    CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id)
+    KEY idx_reports_status (status, id) COMMENT '처리 전 신고를 최신순으로 볼 때',
+    CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users(id),
+    CONSTRAINT fk_reports_handler FOREIGN KEY (handled_by) REFERENCES users(id)
 ) ENGINE=InnoDB COMMENT='신고';
+
+-- 관리자 조치 기록(감사 로그).
+-- 정지·삭제는 되돌리기 어려워 "누가 언제 무엇을 왜" 가 남아야 한다. 이유(reason)는 필수다.
+-- 대상에는 외래키를 걸지 않는다(reports 와 같은 이유: 한 컬럼이 users 와 products 를 동시에 가리킬 수 없다).
+CREATE TABLE admin_actions (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    admin_id    BIGINT       NOT NULL,
+    action      VARCHAR(30)  NOT NULL COMMENT 'SUSPEND_USER | UNSUSPEND_USER | DELETE_PRODUCT | RESOLVE_REPORT | REJECT_REPORT',
+    target_type VARCHAR(20)  NOT NULL COMMENT 'USER | PRODUCT | REPORT',
+    target_id   BIGINT       NOT NULL,
+    report_id   BIGINT       NULL COMMENT '신고를 처리하며 한 조치면 그 신고',
+    reason      VARCHAR(500) NOT NULL COMMENT '관리자가 적은 근거',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_admin_actions_target (target_type, target_id) COMMENT '이 대상에 어떤 조치가 있었나',
+    KEY idx_admin_actions_admin (admin_id, id) COMMENT '관리자별 조치 이력',
+    CONSTRAINT fk_admin_actions_admin FOREIGN KEY (admin_id) REFERENCES users(id)
+) ENGINE=InnoDB COMMENT='관리자 조치 기록';
 
 -- 차단은 한 방향이다. 내가 차단해도 상대의 blocks 행은 생기지 않는다.
 -- "차단했는가"를 볼 때는 양쪽을 모두 본다(내가 차단했거나 상대가 나를 차단했거나).

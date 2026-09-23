@@ -1233,3 +1233,75 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 - 같은 채팅방 알림은 기기에서 하나로 겹친다(`tag`). 차단 관계면 알림이 만들어지지 않으므로 푸시도 없다.
 - 본문은 RFC 8291(aes128gcm)로 암호화하고 RFC 8292(VAPID)로 서명한다. 푸시 서비스가 `404`·`410` 을 주면 그 구독을 지운다.
 - 기기별 암호화·발송 실패를 격리하여 나머지 기기의 발송을 계속한다. 알림 클릭은 서비스 워커에서도 동일 출처의 앱 경로 허용 목록으로 제한한다.
+
+---
+
+## 16. 관리자 — 신고 처리 `/api/admin`
+
+**ADMIN 권한이 필요하다.** 권한이 없으면 `404 RESOURCE_NOT_FOUND`다 — 403을 주면 이 주소에 관리자 기능이 있다는 사실이 드러난다.
+비로그인은 그대로 `401`이다(인증이 먼저다).
+
+관리자는 **DB에서 직접 지정한다.** 권한 상승 API를 만들지 않아 공격 면이 늘지 않는다.
+
+```sql
+UPDATE users SET role = 'ADMIN' WHERE email = '관리자 이메일';
+```
+
+### GET `/api/admin/reports` — 신고 목록
+
+쿼리: `status`(기본 `PENDING`, `ALL`이면 전체) · `targetType`(`USER`/`PRODUCT`) · `cursor` · `size`. 최신순 커서 페이징.
+
+```json
+{
+  "content": [
+    {
+      "id": 12, "targetType": "PRODUCT", "targetId": 44, "targetName": "원목 식탁",
+      "reason": "FRAUD", "detail": "사기 같아요", "status": "PENDING",
+      "reportCount": 3, "reporterNickname": "이웃", "createdAt": "2026-09-23T10:20:00"
+    }
+  ],
+  "nextCursor": "11_11", "hasNext": false
+}
+```
+
+- `reportCount`는 **같은 대상에 쌓인 신고 수**다. 한 건짜리와 여러 건 몰린 것을 목록에서 바로 가른다.
+- `targetName`은 대상이 지워졌으면 `(없는 상품)`, 정지된 사용자면 `닉네임 (정지됨)`처럼 상태를 함께 알린다.
+
+### GET `/api/admin/reports/{id}` — 신고 상세
+
+목록 항목에 더해 `sameTarget`(같은 대상의 다른 신고), `actions`(그 대상에 있었던 관리자 조치), `handledByNickname` · `handledAt` · `adminMemo`를 준다.
+한 건만 보고 판단하면 여러 사람이 같은 문제를 신고했는지 놓친다.
+
+### POST `/api/admin/reports/{id}/resolve` — 신고 인정(조치 포함)
+
+```json
+{ "action": "DELETE_PRODUCT", "reason": "판매 금지 물품입니다." }
+```
+
+`action`: `NONE`(조치 없이 인정) · `SUSPEND_USER` · `DELETE_PRODUCT`. `reason`은 **필수**(500자 이하)다 — 정지·삭제는 되돌리기 어려워 근거가 남아야 한다.
+
+- **같은 대상의 대기 신고가 함께 닫힌다.** 그러지 않으면 같은 상품을 신고 수만큼 반복해서 내리게 된다.
+- `SUSPEND_USER`는 상품 신고에서도 쓸 수 있다(그 상품의 판매자를 정지한다).
+- 대상이 이미 삭제·정지됐으면 **조치는 건너뛰고 신고만 닫는다.** 대상이 사라졌다고 처리 자체가 실패하면 목록에서 영영 지울 수 없다.
+- 조치와 감사 기록(`admin_actions`)은 같은 트랜잭션이다.
+
+| 상황 | 응답 |
+|---|---|
+| 이유가 비었음 | `400 INVALID_INPUT` (`errors[].field = "reason"`) |
+| 이미 처리된 신고 | `409 REPORT_ALREADY_HANDLED` |
+| 관리자 계정을 정지 시도 | `400 CANNOT_SUSPEND_ADMIN` |
+| 상품 신고가 아닌데 `DELETE_PRODUCT` | `400 INVALID_INPUT` |
+| 없는 신고 | `404 REPORT_NOT_FOUND` |
+
+### POST `/api/admin/reports/{id}/reject` — 신고 반려
+
+```json
+{ "reason": "문제 없는 상품입니다." }
+```
+
+대상에는 아무 일도 하지 않고 **이 신고 한 건만** 닫는다. 같은 대상의 다른 신고는 사유가 다를 수 있어 따로 판단한다.
+
+### 정지된 사용자
+
+로그인과 토큰 재발급이 `403 USER_NOT_ACTIVE`로 막힌다. **이미 발급된 access token은 만료(최대 30분)까지 유효하다** — 막으려면 요청마다 회원 상태를 조회해야 해서 JWT의 이점이 사라진다.
+정지는 탈퇴와 달리 개인정보를 지우지 않으며, 해제하면 그대로 돌아온다.

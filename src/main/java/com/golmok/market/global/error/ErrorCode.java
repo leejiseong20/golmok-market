@@ -60,6 +60,9 @@ public enum ErrorCode {
     CANNOT_REPORT_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 신고할 수 없습니다."),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 대상입니다."),
     REPORT_DETAIL_REQUIRED(HttpStatus.BAD_REQUEST, "기타를 고르면 어떤 점이 문제인지 적어 주세요."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
+    REPORT_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리된 신고입니다."),
+    CANNOT_SUSPEND_ADMIN(HttpStatus.BAD_REQUEST, "관리자 계정은 정지할 수 없습니다."),
 
     // ---------- 차단 ----------
     CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),
