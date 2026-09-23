@@ -63,6 +63,8 @@ public enum ErrorCode {
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
     REPORT_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리된 신고입니다."),
     CANNOT_SUSPEND_ADMIN(HttpStatus.BAD_REQUEST, "관리자 계정은 정지할 수 없습니다."),
+    // 대상이 이미 그 상태이거나(이미 정지됨·삭제되지 않은 상품 되살리기) 규칙상 할 수 없는 조치. 메시지는 상황마다 붙인다.
+    ADMIN_ACTION_NOT_ALLOWED(HttpStatus.CONFLICT, "지금 상태에서는 할 수 없는 조치입니다."),
 
     // ---------- 차단 ----------
     CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),

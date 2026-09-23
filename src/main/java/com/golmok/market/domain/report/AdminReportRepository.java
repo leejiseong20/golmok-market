@@ -34,6 +34,18 @@ public interface AdminReportRepository extends JpaRepository<Report, Long> {
     /** 같은 대상의 신고. 상세에서 함께 보여 주고, 처리할 때 한꺼번에 닫는다. */
     List<Report> findByTargetTypeAndTargetIdOrderByIdDesc(ReportTarget targetType, long targetId);
 
+    long countByStatus(ReportStatus status);
+
+    long countByTargetTypeAndTargetId(ReportTarget targetType, long targetId);
+
+    /** 이 판매자의 상품들에 들어온 신고 수(삭제한 상품 포함). 회원 상세에서 본인에 대한 신고와 따로 보여 준다. */
+    @Query("""
+            select count(r) from Report r
+            where r.targetType = :productType
+              and r.targetId in (select p.id from Product p where p.seller.id = :sellerId)
+            """)
+    long countOnProductsOf(ReportTarget productType, long sellerId);
+
     interface TargetCount {
         ReportTarget getTargetType();
         Long getTargetId();

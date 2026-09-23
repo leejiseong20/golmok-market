@@ -64,6 +64,9 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     @Query("select t from Trade t where t.chatRoom.id = :chatRoomId and t.status = :status")
     Optional<Trade> findByChatRoomIdAndStatusForUpdate(long chatRoomId, TradeStatus status);
 
+    /** 관리자 현황판: 기간 안에 끝난 거래 수. completed_at 인덱스가 없어 전체를 훑는다(규모가 작아 괜찮다). */
+    long countByStatusAndCompletedAtGreaterThanEqual(TradeStatus status, LocalDateTime from);
+
     /** 상품에 진행 중인 거래가 있는지. 상품 상태 수동 변경·삭제를 막는 데 쓴다. */
     boolean existsByProductIdAndStatusIn(long productId, Collection<TradeStatus> statuses);
 

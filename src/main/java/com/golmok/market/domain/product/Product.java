@@ -203,6 +203,11 @@ public class Product extends BaseTimeEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
+    /** 관리자가 내린 상품을 되살린다. 누가 지웠는지는 조치 기록으로 판단하므로 호출하는 쪽이 확인한다. */
+    public void restore() {
+        this.deletedAt = null;
+    }
+
     public boolean isDeleted() {
         return this.deletedAt != null;
     }

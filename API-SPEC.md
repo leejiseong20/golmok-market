@@ -1236,7 +1236,7 @@ WebSocket은 **서버 → 클라이언트 알림(푸시)만** 맡는다. 메시�
 
 ---
 
-## 16. 관리자 — 신고 처리 `/api/admin`
+## 16. 관리자 — 신고·회원·상품·조치 기록 `/api/admin`
 
 **ADMIN 권한이 필요하다.** 권한이 없으면 `404 RESOURCE_NOT_FOUND`다 — 403을 주면 이 주소에 관리자 기능이 있다는 사실이 드러난다.
 비로그인은 그대로 `401`이다(인증이 먼저다).
@@ -1305,3 +1305,116 @@ UPDATE users SET role = 'ADMIN' WHERE email = '관리자 이메일';
 
 로그인과 토큰 재발급이 `403 USER_NOT_ACTIVE`로 막힌다. **이미 발급된 access token은 만료(최대 30분)까지 유효하다** — 막으려면 요청마다 회원 상태를 조회해야 해서 JWT의 이점이 사라진다.
 정지는 탈퇴와 달리 개인정보를 지우지 않으며, 해제하면 그대로 돌아온다.
+
+### GET `/api/admin/summary` — 현황판
+
+```json
+{ "pendingReports": 2, "suspendedUsers": 1, "newUsersToday": 3, "newProductsToday": 5, "completedTradesLast7Days": 4 }
+```
+
+"오늘"은 서버 시간대(Asia/Seoul) 자정부터, `completedTradesLast7Days`는 지금부터 7×24시간 안에 `CONFIRMED`가 된 거래 수다.
+가입·등록·거래완료 수는 `created_at`·`completed_at` 인덱스가 없어 표를 전부 훑는다(지금 규모에서는 문제없다).
+
+### GET `/api/admin/users` — 회원 목록
+
+쿼리: `q` · `status`(`ACTIVE`/`SUSPENDED`/`WITHDRAWN`, 생략하면 전체) · `cursor` · `size`. 최신 가입순.
+
+- `q`에 `@`가 있으면 **이메일 전체 일치**, 없으면 **닉네임 부분 일치**다. 이메일 앞부분만으로는 찾지 않는다 — 가린 이메일을 한 글자씩 맞혀 알아내지 못하게.
+- 닉네임 검색어의 `%`·`_`는 글자 그대로 찾는다.
+- **이메일은 가려서 준다**(`demo4@golmok.test` → `de***@golmok.test`, 앞부분이 두 글자 이하면 한 글자만 남긴다). 관리자라도 필요 이상으로 개인정보를 보지 않는다.
+
+```json
+{
+  "content": [
+    { "id": 9, "email": "de***@golmok.test", "nickname": "골목이웃", "admin": false, "status": "ACTIVE",
+      "createdAt": "2026-09-01T09:00:00", "lastLoginAt": "2026-09-23T08:00:00" }
+  ],
+  "nextCursor": null, "hasNext": false
+}
+```
+
+### GET `/api/admin/users/{id}` — 회원 상세
+
+```json
+{
+  "user": { "id": 9, "email": "de***@golmok.test", "nickname": "골목이웃", "admin": false, "status": "ACTIVE",
+            "createdAt": "2026-09-01T09:00:00", "lastLoginAt": "2026-09-23T08:00:00" },
+  "profileImageUrl": null, "mannerTemp": 36.5,
+  "activeProductCount": 2, "reportsOnUser": 1, "reportsOnProducts": 3,
+  "actions": [ { "id": 7, "action": "SUSPEND_USER", "adminNickname": "운영자", "reason": "…", "createdAt": "…" } ]
+}
+```
+
+`reportsOnUser`는 회원 자체에 들어온 신고, `reportsOnProducts`는 그 회원의 상품(삭제한 것 포함)에 들어온 신고 수다. `actions`는 최근 것부터.
+없는 회원은 `404 USER_NOT_FOUND`다(권한 없음의 `RESOURCE_NOT_FOUND`와 코드가 다르다).
+
+### POST `/api/admin/users/{id}/suspend` · `/unsuspend` — 정지 · 정지 해제
+
+```json
+{ "reason": "직접 확인한 사기 시도" }
+```
+
+신고 없이 하는 직접 조치다. 응답은 회원 상세와 같다. 기록(`admin_actions`)은 `reportId: null`로 남는다.
+**그 회원에 대한 대기 신고는 닫지 않는다** — 신고 판단은 신고함에서 따로 한다.
+
+| 상황 | 응답 |
+|---|---|
+| 이유가 비었음 | `400 INVALID_INPUT` |
+| 관리자 계정 정지 | `400 CANNOT_SUSPEND_ADMIN` |
+| 이미 정지됨 / 정지되지 않은 회원 해제 / 탈퇴한 회원 정지 | `409 ADMIN_ACTION_NOT_ALLOWED` (메시지로 구분) |
+| 없는 회원 | `404 USER_NOT_FOUND` |
+
+### GET `/api/admin/products` — 상품 목록
+
+쿼리: `q`(제목 부분 일치) · `sellerId` · `deleted`(`true` 삭제만, `false` 보이는 것만, 생략하면 전부) · `cursor` · `size`. 최신 등록순. **삭제한 상품도 보인다.**
+
+```json
+{
+  "content": [
+    { "id": 44, "title": "원목 식탁", "price": 50000, "status": "ON_SALE", "thumbnailUrl": "/uploads/…",
+      "sellerId": 9, "sellerNickname": "골목이웃", "deleted": true, "deletedByAdmin": true,
+      "reportCount": 3, "createdAt": "2026-09-20T10:00:00" }
+  ],
+  "nextCursor": null, "hasNext": false
+}
+```
+
+`deletedByAdmin`: 마지막 내리기·되살리기 조치가 관리자의 "내리기"인지. 이것이 `true`일 때만 되살릴 수 있다.
+
+### GET `/api/admin/products/{id}` — 상품 상세
+
+`{ "product": { …목록 항목 }, "description": "…", "actions": [ … ] }`. 삭제한 상품도 볼 수 있다(일반 상세 API는 404).
+
+### POST `/api/admin/products/{id}/delete` · `/restore` — 내리기 · 되살리기
+
+```json
+{ "reason": "판매 금지 물품입니다." }
+```
+
+- 내리기는 soft delete다. 진행 중인 거래가 있어도 막지 않는다(신고 처리의 "상품 내리기"와 같은 규칙).
+- **되살리기는 관리자가 내린 상품만 된다.** 판매자가 직접 지운 상품은 판매자의 뜻을 뒤집게 되고, 탈퇴한 판매자의 상품은 주인이 없다.
+  누가 지웠는지는 조치 기록의 마지막 `DELETE_PRODUCT`·`RESTORE_PRODUCT`로 가른다.
+- 응답은 상품 상세와 같다.
+
+| 상황 | 응답 |
+|---|---|
+| 이유가 비었음 | `400 INVALID_INPUT` |
+| 이미 삭제된 상품 내리기 / 삭제되지 않은 상품 되살리기 | `409 ADMIN_ACTION_NOT_ALLOWED` |
+| 판매자가 직접 지운 상품 / 탈퇴한 판매자의 상품 되살리기 | `409 ADMIN_ACTION_NOT_ALLOWED` (메시지로 구분) |
+| 없는 상품 | `404 PRODUCT_NOT_FOUND` |
+
+### GET `/api/admin/actions` — 조치 기록
+
+쿼리: `action`(`SUSPEND_USER`/`UNSUSPEND_USER`/`DELETE_PRODUCT`/`RESTORE_PRODUCT`/`RESOLVE_REPORT`/`REJECT_REPORT`) · `targetType`(`USER`/`PRODUCT`/`REPORT`) · `cursor` · `size`. 최신순. 읽기만 한다.
+
+```json
+{
+  "content": [
+    { "id": 3, "action": "DELETE_PRODUCT", "adminNickname": "운영자", "targetType": "PRODUCT", "targetId": 44,
+      "targetName": "원목 식탁", "reportId": 12, "reason": "판매 금지 물품", "createdAt": "2026-09-23T10:30:00" }
+  ],
+  "nextCursor": null, "hasNext": false
+}
+```
+
+`reportId`는 신고를 처리하며 한 조치면 그 신고 id, 직접 조치면 `null`이다. `targetName`은 신고면 `신고 #12`, 대상이 사라졌으면 `(없는 사용자)`·`(없는 상품)`이다.
