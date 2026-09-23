@@ -4,7 +4,7 @@
 
 - **프론트엔드 저장소:** [golmok-market-frontend](https://github.com/leejiseong20/golmok-market-frontend) (React 18 + Vite)
 - **데모:** https://golmok-market-frontend.vercel.app — 데모 계정 `demo4@golmok.test` / `Golmok123!`
-  > 백엔드는 AWS Academy Learner Lab 에서 돌아갑니다. **랩 세션이 꺼져 있으면 목록이 비어 보입니다.** 보실 시간을 알려 주시면 켜 두겠습니다.
+  > 백엔드는 AWS Academy Learner Lab 에서 돌아갑니다. **랩 세션이 꺼져 있으면 사이트 위쪽에 "데모 서버가 지금 꺼져 있어요" 안내가 뜹니다** — 아래 [화면](#화면) 캡처로 보실 수 있고, 보실 시간을 알려 주시면 켜 두겠습니다.
 
 | | |
 |---|---|
