@@ -75,6 +75,8 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/reissue").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check-email", "/api/auth/check-nickname").permitAll()
+                        // 화면 오류 보고. 비로그인 화면도 망가질 수 있어 연다(요청 수 제한은 컨트롤러가 한다).
+                        .requestMatchers(HttpMethod.POST, "/api/client-errors").permitAll()
 
                         // 비로그인 사용자도 둘러볼 수 있는 조회 API(업로드 이미지 포함).
                         // HEAD 도 함께 연다 — 본문 없는 GET 이라 공개 범위가 넓어지지 않고,

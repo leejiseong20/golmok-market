@@ -39,6 +39,8 @@ public enum ErrorCode {
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     // 비밀번호 대입 공격을 늦춘다. 잠긴 동안에는 맞는 비밀번호도 막는다(LoginAttemptGuard).
     TOO_MANY_LOGIN_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "로그인 시도가 너무 많습니다. 10분 뒤에 다시 시도해 주세요."),
+    // 화면 오류 보고(/api/client-errors)를 너무 자주 보냈다. 화면은 이 응답을 무시한다.
+    TOO_MANY_CLIENT_ERRORS(HttpStatus.TOO_MANY_REQUESTS, "오류 보고가 너무 많습니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "로그인이 만료되었습니다. 다시 로그인해 주세요."),
     USER_NOT_ACTIVE(HttpStatus.FORBIDDEN, "이용할 수 없는 계정입니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),

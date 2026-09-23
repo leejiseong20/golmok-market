@@ -9,6 +9,7 @@ import com.golmok.market.domain.auth.dto.SignupRequest;
 import com.golmok.market.domain.auth.dto.SignupResponse;
 import com.golmok.market.domain.auth.dto.TokenResponse;
 import com.golmok.market.global.security.AuthUser;
+import com.golmok.market.global.web.ClientIp;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -41,23 +42,8 @@ public class AuthController {
     public LoginResponse login(@Valid @RequestBody LoginRequest request,
                                @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
                                HttpServletRequest servletRequest) {
-        return authService.login(request, userAgent, clientIp(servletRequest));
-    }
-
-    /**
-     * 실패 횟수를 셀 때 쓰는 클라이언트 주소(LoginAttemptGuard).
-     *
-     * 운영에서는 Caddy 를 거치므로 소켓 주소는 항상 Caddy 다. Caddy 는 X-Forwarded-For 뒤에 실제 접속 IP 를 덧붙이므로
-     * **맨 뒤 값**이 우리 앞단이 직접 본 주소다. 앞쪽 값은 클라이언트가 마음대로 적어 보낼 수 있어 믿지 않는다.
-     * 헤더가 없으면(로컬 개발·직접 접속) 소켓 주소를 쓴다.
-     */
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded == null || forwarded.isBlank()) {
-            return request.getRemoteAddr();
-        }
-        String[] hops = forwarded.split(",");
-        return hops[hops.length - 1].trim();
+        // 실패 횟수를 셀 때 쓰는 클라이언트 주소(LoginAttemptGuard). 규칙은 ClientIp 참고.
+        return authService.login(request, userAgent, ClientIp.of(servletRequest));
     }
 
     @PostMapping("/reissue")

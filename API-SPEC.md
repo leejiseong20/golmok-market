@@ -1418,3 +1418,42 @@ UPDATE users SET role = 'ADMIN' WHERE email = '관리자 이메일';
 ```
 
 `reportId`는 신고를 처리하며 한 조치면 그 신고 id, 직접 조치면 `null`이다. `targetName`은 신고면 `신고 #12`, 대상이 사라졌으면 `(없는 사용자)`·`(없는 상품)`이다.
+
+## 17. 화면 오류 보고 `/api/client-errors`
+
+화면의 오류 경계(Error Boundary)가 잡은 렌더 오류를 받아 **서버 로그에 한 줄**로 남긴다. DB에는 넣지 않는다.
+경계는 원래 오류를 브라우저 콘솔에만 남겨, 운영에서 사용자에게 난 오류를 알 방법이 없었다.
+
+### POST `/api/client-errors`
+
+**로그인 없이 받는다.** 로그인하지 않은 사람의 화면도 망가질 수 있고, 토큰이 만료된 채 망가진 화면이 재발급까지 할 수는 없다. 화면도 토큰을 싣지 않는다.
+
+```json
+{
+  "boundary": "관리자 본문",
+  "kind": "RENDER",
+  "message": "Cannot read properties of null (reading 'id')",
+  "path": "/admin/users",
+  "componentStack": "\n    at AdminUsers\n    at AdminApp"
+}
+```
+
+| 필드 | 규칙 |
+|---|---|
+| `boundary` | 필수, 30자 이하. 잡은 경계 이름(앱·본문·창·관리자 본문·카테고리·인기 검색어·사이드바) |
+| `kind` | 필수. `RENDER`(그리다 던짐) · `CHUNK`(나눠진 파일을 받지 못함 — 배포 뒤 예전 화면) |
+| `message` | 필수, 300자 이하 |
+| `path` | 필수, 200자 이하, `/` 로 시작하고 **`?`·`#` 가 있으면 거절**한다(쿼리에는 검색어가 들어 있을 수 있다) |
+| `componentStack` | 선택, 2000자 이하 |
+
+성공하면 `204`. **사람을 가릴 수 있는 값(회원 id·토큰·쿼리)은 받지 않는다.** 브라우저 정보(`User-Agent` 헤더)는 200자까지만 로그에 남긴다.
+
+- 로그 형식: `[client-error] kind=… boundary=… path=… message=… userAgent=… stack=…`. 보는 법: `docker compose logs app | grep client-error`.
+- **남기기 전에 제어문자(줄바꿈·U+2028 등)를 공백으로 바꾼다.** 메시지는 브라우저가 마음대로 보낼 수 있어, 줄바꿈으로 가짜 로그 줄을 끼워 넣을 수 있다. 한 보고는 반드시 한 줄이다.
+- **요청 수 제한(메모리):** 같은 IP 1분 10건, 전체 1분 300건. 넘으면 `429 TOO_MANY_CLIENT_ERRORS`(화면은 무시한다). IP 는 로그인 실패 제한과 같이 `X-Forwarded-For` 의 **맨 뒤 값**이다(앞쪽 값은 클라이언트가 지어낼 수 있다).
+- 화면은 한 페이지를 여는 동안 같은 오류를 한 번, 모두 합쳐 5건까지만 보낸다.
+
+| 상황 | 응답 |
+|---|---|
+| 필수값 누락·길이 초과·잘못된 `kind`·경로에 쿼리 | `400 INVALID_INPUT` |
+| 요청이 너무 많음 | `429 TOO_MANY_CLIENT_ERRORS` |
