@@ -12,6 +12,7 @@ import com.golmok.market.global.error.BusinessException;
 import com.golmok.market.global.error.ErrorCode;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,7 @@ public class WithdrawalService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void withdraw(AuthUser viewer, String password) {
@@ -83,5 +85,7 @@ public class WithdrawalService {
         userRegionRepository.deleteAllByUserId(user.getId());
         refreshTokenRepository.deleteAllByUserId(user.getId());
         user.withdraw(now);
+        // 다른 기기에 남은 access token 도 곧바로 막히게 인증 캐시를 비운다(UserAccessCache).
+        eventPublisher.publishEvent(new UserAccessChangedEvent(user.getId()));
     }
 }

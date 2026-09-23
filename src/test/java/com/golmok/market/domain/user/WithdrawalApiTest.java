@@ -160,7 +160,7 @@ class WithdrawalApiTest {
     }
 
     @Test
-    void 탈퇴한_회원은_원래_이메일로_로그인할_수_없고_프로필_후기_내_정보가_404_다() throws Exception {
+    void 탈퇴한_회원은_원래_이메일로_로그인할_수_없고_프로필_후기는_404_남은_토큰은_403_이다() throws Exception {
         withdraw(myToken, PASSWORD).andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
@@ -171,13 +171,15 @@ class WithdrawalApiTest {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
         mockMvc.perform(get("/api/users/{id}/reviews", me.getId()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
-        // 남은 access token(최대 30분)으로 내 정보를 보거나 익명화된 프로필을 되돌리지 못한다.
-        mockMvc.perform(auth(get("/api/users/me"), myToken)).andExpect(status().isNotFound());
+        // 남은 access token(최대 30분)은 인증 필터에서 곧바로 막힌다(UserAccessCache). 예전에는 만료까지 살아 있어
+        // 서비스마다 404 로 막아야 했다 — 내 정보·프로필 되살리기·다시 탈퇴 모두 필터 단계에서 403 이다.
+        mockMvc.perform(auth(get("/api/users/me"), myToken))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("USER_NOT_ACTIVE"));
         mockMvc.perform(auth(patch("/api/users/me"), myToken).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"되살리기\",\"profileImageUrl\":null}"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
         withdraw(myToken, PASSWORD)
-                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("USER_NOT_ACTIVE"));
     }
 
     @Test

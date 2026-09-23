@@ -29,7 +29,7 @@ import java.security.Principal;
  * 다른 사용자의 큐에 가짜 메시지를 넣는 것이 가능해진다.
  *
  * 거부하면 ERROR 프레임의 message 헤더에 에러 코드(EXPIRED_TOKEN 등)를 담고 연결을 끊는다.
- * 프론트는 EXPIRED_TOKEN 이면 REST 로 토큰을 재발급한 뒤 다시 연결한다.
+ * 프론트는 EXPIRED_TOKEN 이면 REST 로 토큰을 재발급한 뒤 다시 연결한다. USER_NOT_ACTIVE(정지·탈퇴)면 세션을 지운다.
  */
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
@@ -40,9 +40,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider tokenProvider;
+    private final UserAccessCache userAccessCache;
 
-    public StompAuthChannelInterceptor(JwtTokenProvider tokenProvider) {
+    public StompAuthChannelInterceptor(JwtTokenProvider tokenProvider, UserAccessCache userAccessCache) {
         this.tokenProvider = tokenProvider;
+        this.userAccessCache = userAccessCache;
     }
 
     /**
@@ -79,11 +81,17 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (header == null || !header.startsWith(BEARER_PREFIX)) {
             throw reject(ErrorCode.UNAUTHORIZED);
         }
+        AuthUser parsed;
         try {
-            return tokenProvider.parseAccessToken(header.substring(BEARER_PREFIX.length()).trim());
+            parsed = tokenProvider.parseAccessToken(header.substring(BEARER_PREFIX.length()).trim());
         } catch (BusinessException e) {
             throw reject(e.getErrorCode());
         }
+        // REST 와 같은 규칙: 정지·탈퇴한 회원은 토큰이 살아 있어도 새로 연결하지 못한다(이미 열린 연결은 끊지 않는다).
+        UserAccessCache.UserAccess access = userAccessCache.get(parsed.id())
+                .filter(UserAccessCache.UserAccess::active)
+                .orElseThrow(() -> reject(ErrorCode.USER_NOT_ACTIVE));
+        return new AuthUser(parsed.id(), access.role());
     }
 
     private void requireOwnQueue(StompHeaderAccessor accessor) {

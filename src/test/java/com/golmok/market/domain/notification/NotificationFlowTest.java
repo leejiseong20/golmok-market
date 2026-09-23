@@ -73,6 +73,7 @@ class NotificationFlowTest {
     @Autowired FavoriteRepository favoriteRepository;
     @Autowired com.golmok.market.domain.block.BlockRepository blockRepository;
     @Autowired FavoriteService favoriteService;
+    @Autowired NotificationRepository notificationRepository;
     @Autowired ImageService imageService;
     @Autowired ImageProperties imageProperties;
     @Autowired JwtTokenProvider tokenProvider;
@@ -155,7 +156,8 @@ class NotificationFlowTest {
         notificationService.create(new NotificationRequestedEvent(other.getId(), NotificationType.TRADE,
                 "판매자가 예약을 취소했어요", "원목 식탁", "/chat-rooms/1"));
 
-        notifications(otherToken).andExpect(jsonPath("$.content", hasSize(0)));
+        // 탈퇴한 회원의 토큰은 이제 곧바로 막히므로(UserAccessCache) 알림함 API 대신 저장소를 본다.
+        assertThat(notificationRepository.countByUserIdAndReadFalse(other.getId())).isZero();
     }
 
     /**

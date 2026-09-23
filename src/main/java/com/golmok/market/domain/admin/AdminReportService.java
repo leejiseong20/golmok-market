@@ -11,6 +11,7 @@ import com.golmok.market.domain.report.Report;
 import com.golmok.market.domain.report.ReportStatus;
 import com.golmok.market.domain.report.ReportTarget;
 import com.golmok.market.domain.user.User;
+import com.golmok.market.domain.user.UserAccessChangedEvent;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.domain.user.UserRole;
 import com.golmok.market.global.error.BusinessException;
@@ -20,6 +21,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,7 @@ public class AdminReportService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
     public CursorResponse<AdminReportSummary> list(ReportStatus status, ReportTarget targetType,
                                                    String rawCursor, Integer rawSize) {
@@ -113,6 +116,8 @@ public class AdminReportService {
             }
             if (!target.isSuspended()) {
                 target.suspend();
+                // 이미 받은 access token 으로도 곧바로 막히게 인증 캐시를 비운다(UserAccessCache).
+                eventPublisher.publishEvent(new UserAccessChangedEvent(targetUserId));
                 action = AdminActionType.SUSPEND_USER;
             }
         }

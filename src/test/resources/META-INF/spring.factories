@@ -1,0 +1,2 @@
+# 테스트 메서드마다 인증 캐시를 비운다(UserAccessCacheResetListener 참고).
+org.springframework.test.context.TestExecutionListener=com.golmok.market.global.security.UserAccessCacheResetListener

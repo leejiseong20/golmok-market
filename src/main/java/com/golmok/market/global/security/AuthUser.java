@@ -8,6 +8,8 @@ import com.golmok.market.domain.user.UserRole;
  * User 엔티티를 그대로 principal 로 두지 않는 이유:
  * access token 만으로 인증하므로 요청마다 DB 를 조회하지 않는다.
  * 토큰에 든 최소 정보(id, role)만 들고 다니고, 필요한 서비스에서만 User 를 조회한다.
+ * 단, 회원 상태·권한은 인증 필터가 UserAccessCache(회원당 60초 기억)로 DB 기준 값을 확인해 채운다 —
+ * 정지·탈퇴·관리자 해제가 토큰 만료(최대 30분)를 기다리지 않고 반영되게 하려는 것이다.
  */
 public record AuthUser(Long id, UserRole role) {
 }

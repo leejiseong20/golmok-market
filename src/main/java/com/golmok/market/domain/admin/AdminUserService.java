@@ -8,6 +8,7 @@ import com.golmok.market.domain.report.AdminReportRepository;
 import com.golmok.market.domain.report.ReportTarget;
 import com.golmok.market.domain.user.AdminUserRepository;
 import com.golmok.market.domain.user.User;
+import com.golmok.market.domain.user.UserAccessChangedEvent;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.domain.user.UserRole;
 import com.golmok.market.domain.user.UserStatus;
@@ -18,6 +19,7 @@ import com.golmok.market.global.pagination.CursorResponse;
 import com.golmok.market.global.pagination.PageSize;
 import com.golmok.market.global.security.AuthUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,7 @@ public class AdminUserService {
     private final AdminProductRepository adminProductRepository;
     private final AdminReportRepository adminReportRepository;
     private final AdminActionRepository adminActionRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 검색어에 @ 가 있으면 이메일 전체 일치, 없으면 닉네임 부분 일치로 찾는다. */
     public CursorResponse<AdminUserSummary> list(String query, UserStatus status, String rawCursor, Integer rawSize) {
@@ -71,7 +74,7 @@ public class AdminUserService {
     }
 
     /**
-     * 정지. 로그인·토큰 재발급이 막힌다(이미 받은 access token 은 만료까지 살아 있다 — User.suspend 참고).
+     * 정지. 로그인·토큰 재발급과, 이미 받은 access token 으로 하는 요청까지 곧바로 막힌다(UserAccessCache).
      * 잠근 뒤 상태를 확인해, 두 관리자가 동시에 눌러도 기록이 한 번만 남는다.
      */
     @Transactional
@@ -87,6 +90,8 @@ public class AdminUserService {
             throw new BusinessException(ErrorCode.ADMIN_ACTION_NOT_ALLOWED, "이미 정지된 회원입니다.");
         }
         target.suspend();
+        // 이미 받은 access token 으로도 곧바로 막히게 인증 캐시를 비운다(UserAccessCache).
+        eventPublisher.publishEvent(new UserAccessChangedEvent(userId));
         record(viewer, AdminActionType.SUSPEND_USER, userId, reason);
         return detail(userId);
     }
@@ -98,6 +103,7 @@ public class AdminUserService {
             throw new BusinessException(ErrorCode.ADMIN_ACTION_NOT_ALLOWED, "정지된 회원이 아닙니다.");
         }
         target.unsuspend();
+        eventPublisher.publishEvent(new UserAccessChangedEvent(userId));
         record(viewer, AdminActionType.UNSUSPEND_USER, userId, reason);
         return detail(userId);
     }

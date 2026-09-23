@@ -6,6 +6,7 @@ import com.golmok.market.global.security.JwtTokenProvider;
 import com.golmok.market.global.security.RestAccessDeniedHandler;
 import com.golmok.market.global.security.RestAuthenticationEntryPoint;
 import com.golmok.market.global.security.SecurityErrorWriter;
+import com.golmok.market.global.security.UserAccessCache;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -57,6 +58,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtTokenProvider tokenProvider,
                                                    SecurityErrorWriter errorWriter,
+                                                   UserAccessCache userAccessCache,
                                                    RestAuthenticationEntryPoint authenticationEntryPoint,
                                                    RestAccessDeniedHandler accessDeniedHandler) throws Exception {
         http
@@ -99,7 +101,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
 
-                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider, errorWriter),
+                .addFilterBefore(new JwtAuthenticationFilter(tokenProvider, errorWriter, userAccessCache),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -9,6 +9,7 @@ import com.golmok.market.domain.product.ProductRepository;
 import com.golmok.market.domain.region.Region;
 import com.golmok.market.domain.region.RegionRepository;
 import com.golmok.market.domain.user.User;
+import com.golmok.market.domain.user.UserAccessChangedEvent;
 import com.golmok.market.domain.user.UserRepository;
 import com.golmok.market.global.security.AuthUser;
 import com.golmok.market.global.security.JwtProperties;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -28,6 +30,8 @@ import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
 import org.springframework.messaging.simp.user.SimpUser;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
@@ -73,6 +77,8 @@ class ChatWebSocketTest {
     @Autowired JwtTokenProvider tokenProvider;
     @Autowired JwtProperties jwtProperties;
     @Autowired SimpUserRegistry userRegistry;
+    @Autowired ApplicationEventPublisher eventPublisher;
+    @Autowired PlatformTransactionManager transactionManager;
 
     private final WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
     private final List<StompSession> sessions = new ArrayList<>();
@@ -217,6 +223,21 @@ class ChatWebSocketTest {
         String expired = new JwtTokenProvider(jwtProperties, past).createAccessToken(buyer.getId(), buyer.getRole());
         // 프론트는 이 코드를 보고 토큰을 재발급한 뒤 다시 연결한다.
         assertThat(errorCode(connect("Bearer " + expired, new WebSocketHttpHeaders()))).isEqualTo("EXPIRED_TOKEN");
+    }
+
+    @Test
+    void 정지된_회원은_토큰이_살아_있어도_새로_연결하지_못한다() throws Exception {
+        // 먼저 연결해 인증 캐시에 "정상"을 담아 둔다. 정지가 캐시를 비우지 못하면 이 값 때문에 다시 연결된다.
+        sessions.add(connectAs(outsider));
+        // 이 테스트는 롤백하지 않는다 — 커밋 뒤 캐시 비우기까지 실제 흐름대로 지난다.
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            userRepository.findById(outsider.getId()).orElseThrow().suspend();
+            eventPublisher.publishEvent(new UserAccessChangedEvent(outsider.getId()));
+        });
+
+        // 프론트는 이 코드를 보고 세션을 지운다(로그아웃).
+        assertThat(errorCode(connect("Bearer " + token(outsider), new WebSocketHttpHeaders())))
+                .isEqualTo("USER_NOT_ACTIVE");
     }
 
     @Test

@@ -110,7 +110,8 @@ public class User extends BaseTimeEntity {
 
     // ---------- 관리자 조치 ----------
     // 정지는 탈퇴와 다르다. 개인정보를 지우지 않고 상태만 바꾼다(해제하면 그대로 돌아온다).
-    // 로그인·재발급은 requireActive 가 막는다. 이미 발급된 access token 은 만료(최대 30분)까지 살아 있다.
+    // 로그인·재발급은 requireActive 가 막고, 이미 발급된 access token 으로 하는 요청은 인증 필터가 막는다
+    // (UserAccessCache — 상태를 바꾸는 서비스가 UserAccessChangedEvent 를 발행해야 곧바로 반영된다).
 
     public void suspend() {
         if (isWithdrawn()) {

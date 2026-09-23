@@ -27,6 +27,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     int adjustMannerTemp(long id, BigDecimal delta);
 
+    /**
+     * 인증 필터가 요청마다(캐시가 없을 때) 확인하는 값. 엔티티 전체가 아니라 두 칸만 읽는다.
+     * 필터는 트랜잭션 밖이라 엔티티를 읽으면 영속성 컨텍스트 없이 버려질 객체를 만든다.
+     */
+    @Query("select u.role as role, u.status as status from User u where u.id = :id")
+    Optional<AccessRow> findAccess(long id);
+
+    interface AccessRow {
+        UserRole getRole();
+        UserStatus getStatus();
+    }
+
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
